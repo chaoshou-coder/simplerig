@@ -28,7 +28,21 @@
 #### 方式 A：从 PyPI 安装（推荐用户）
 
 ```bash
+# 1. 创建并激活虚拟环境（推荐）
+python -m venv .venv
+
+# Linux/macOS:
+source .venv/bin/activate
+# Windows PowerShell:
+# .venv\Scripts\Activate
+# Windows CMD:
+# .venv\Scripts\activate.bat
+
+# 2. 安装 SimpleRig
 pip install simplerig
+
+# 3. 验证安装
+simplerig --help
 ```
 
 #### 方式 B：从源码安装（推荐开发者）
