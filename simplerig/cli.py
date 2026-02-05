@@ -191,7 +191,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 def get_runs_dir() -> Path:
     """获取 runs 目录"""
-    return Path(".simplerig/runs")
+    return Path("simplerig_data/runs")
 
 
 def generate_run_id() -> str:

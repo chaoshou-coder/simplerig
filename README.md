@@ -101,7 +101,7 @@ your-project/
    simplerig emit run.completed --run-id <run_id>
    ```
 
-编辑器 Agent 会读取 SimpleRig Skill，按照框架定义的流程执行任务，并将产物写入 `.simplerig/runs/<run_id>/artifacts/`。
+编辑器 Agent 会读取 SimpleRig Skill，按照框架定义的流程执行任务，并将产物写入 `simplerig_data/runs/<run_id>/artifacts/`。
 
 #### CLI 辅助命令
 
@@ -169,11 +169,11 @@ project:
 | `simplerig tail` | 实时查看事件流 | `simplerig tail --follow` |
 | `simplerig stats` | 查看统计报告 | `simplerig stats --json` |
 
-> 注：在编辑器内使用 Skill 时，Agent 通过 `init/emit` 记录事件；`simplerig run` 仍可用于本地演示/调试框架阶段机（stub 逻辑）。
+> 注：如果 `simplerig` 命令不可用，可使用 `python -m simplerig.cli` 替代（如 `python -m simplerig.cli init "需求"`）。
 
 ## 📊 统计与产物
 
-每次运行的产物存储在 `.simplerig/runs/<run_id>/`：
+每次运行的产物存储在 `simplerig_data/runs/<run_id>/`：
 
 - **`events.jsonl`**: 事实源，包含所有操作记录。
 - **`artifacts/`**:

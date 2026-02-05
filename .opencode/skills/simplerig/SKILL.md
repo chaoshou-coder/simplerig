@@ -16,7 +16,10 @@ description: SimpleRig Skill 驱动工作流。Agent 按阶段执行开发并记
 2. **检查配置**：确认项目根目录有 `config.yaml` 或 `SIMPLERIG_CONFIG`
 3. **初始化 run**：
    ```bash
+   # 优先使用
    simplerig init "用户的需求描述"
+   # 如果上述命令失败，使用备用方式
+   python -m simplerig.cli init "用户的需求描述"
    # 输出: run_id=20260205_120000_abc123
    ```
 4. **记录 run_id**：后续命令都需要使用
@@ -28,7 +31,7 @@ description: SimpleRig Skill 驱动工作流。Agent 按阶段执行开发并记
    - 需要创建的文件
    - 需要修改的文件
    - 实现步骤
-3. 将计划保存到 `.simplerig/runs/<run_id>/artifacts/plan.json`
+3. 将计划保存到 `simplerig_data/runs/<run_id>/artifacts/plan.json`
 4. 记录完成事件：
    ```bash
    simplerig emit stage.completed --stage plan --run-id <run_id>
@@ -66,12 +69,21 @@ description: SimpleRig Skill 驱动工作流。Agent 按阶段执行开发并记
 
 ## 事件与产物
 
-- 事件日志：`.simplerig/runs/<run_id>/events.jsonl`
-- 产物目录：`.simplerig/runs/<run_id>/artifacts/`
+- 事件日志：`simplerig_data/runs/<run_id>/events.jsonl`
+- 产物目录：`simplerig_data/runs/<run_id>/artifacts/`
+
+## 命令备用方式
+
+如果 `simplerig` 命令不可用，使用 `python -m simplerig.cli` 替代：
+```bash
+python -m simplerig.cli init "需求"
+python -m simplerig.cli emit stage.completed --stage plan --run-id <run_id>
+python -m simplerig.cli status
+```
 
 ## 断点续传
 
-如果中断，用户说“继续”时：
+如果中断，用户说"继续"时：
 
 1. `simplerig status` 查看最近运行状态
 2. `simplerig tail --follow` 查看事件流

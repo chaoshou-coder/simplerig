@@ -98,7 +98,7 @@ class Config:
         # 检查标准位置
         for location in [
             "./config.yaml",
-            "./.simplerig/config.yaml",
+            "./simplerig_data/config.yaml",
             os.path.expanduser("~/.config/simplerig/config.yaml"),
         ]:
             path = Path(location)
@@ -168,8 +168,8 @@ class Config:
                 "dev": "opencode/kimi-k2.5-free",
             },
             paths={
-                "database": Path("./.simplerig/memory.db"),
-                "logs": Path("./.simplerig/logs"),
+                "database": Path("./simplerig_data/memory.db"),
+                "logs": Path("./simplerig_data/logs"),
             },
             project={
                 "source_dirs": ["src"],

@@ -102,7 +102,7 @@ SimpleRig 的“事实源（Source of Truth）”不是内存中的对象，而�
 
 ## 3. 数据流与产物
 
-工作流执行过程中会产生多种数据，分层存储于 `.simplerig/runs/<run_id>/`：
+工作流执行过程中会产生多种数据，分层存储于 `simplerig_data/runs/<run_id>/`：
 
 | 目录/文件 | 说明 | 格式 |
 |---|---|---|

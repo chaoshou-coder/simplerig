@@ -41,10 +41,10 @@ class Event:
     
     @classmethod
     def create(cls, event_type: str, run_id: str = "", **data) -> "Event":
-        """创建新事件"""
+        """创建新事件（使用系统本地时区）"""
         return cls(
             type=event_type,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now().astimezone().isoformat(),
             run_id=run_id,
             data=data,
         )

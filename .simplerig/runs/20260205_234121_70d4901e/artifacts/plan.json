@@ -1,0 +1,36 @@
+{
+  "requirement": "鏍规嵁 docs/features/stats-spec.md 鍜?docs/features/stats.feature 瀵归」鐩繘琛?BDD 娴嬭瘯",
+  "stages": [
+    "plan",
+    "develop",
+    "verify",
+    "integrate"
+  ],
+  "tasks": [
+    {
+      "id": "task_analyze",
+      "name": "需求分析",
+      "description": "分析需求: 鏍规嵁 docs/features/stats-spec.md 鍜?docs/features/stats.feature 瀵归」鐩繘琛?BDD 娴嬭瘯",
+      "parallel_group": 0
+    },
+    {
+      "id": "task_design",
+      "name": "设计方案",
+      "description": "设计实现方案",
+      "dependencies": [
+        "task_analyze"
+      ],
+      "parallel_group": 1
+    },
+    {
+      "id": "task_implement",
+      "name": "代码实现",
+      "description": "实现代码",
+      "dependencies": [
+        "task_design"
+      ],
+      "parallel_group": 2
+    }
+  ],
+  "stub": true
+}

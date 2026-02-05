@@ -1,0 +1,20 @@
+{
+  "requirement": "鏍规嵁 docs/features/stats-spec.md 鍜?docs/features/stats.feature 瀵归」鐩繘琛?BDD 娴嬭瘯",
+  "verify_result": {
+    "requirement": "鏍规嵁 docs/features/stats-spec.md 鍜?docs/features/stats.feature 瀵归」鐩繘琛?BDD 娴嬭瘯",
+    "lint": {
+      "success": true,
+      "report": "✅ Lint check passed! (auto-fixed 5 issues)"
+    },
+    "tests": {
+      "success": true,
+      "report": "Tests skipped (stub)"
+    },
+    "overall_success": true
+  },
+  "integration": {
+    "applied_changes": [],
+    "commit_hash": null
+  },
+  "stub": true
+}

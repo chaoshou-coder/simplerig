@@ -1,0 +1,9 @@
+{
+  "requirement": "test stats feature",
+  "verify_result": null,
+  "integration": {
+    "applied_changes": [],
+    "commit_hash": null
+  },
+  "stub": true
+}
