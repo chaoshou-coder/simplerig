@@ -39,9 +39,16 @@ pip install simplerig
 git clone https://github.com/chaoshou-coder/simplerig.git
 cd simplerig
 
-# 创建并激活虚拟环境
+# 创建虚拟环境
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# 激活虚拟环境
+# Linux/macOS:
+source .venv/bin/activate
+# Windows PowerShell:
+# .venv\Scripts\Activate
+# Windows CMD:
+# .venv\Scripts\activate.bat
 
 # 安装开发依赖
 pip install -e ".[dev]"
