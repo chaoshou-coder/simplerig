@@ -62,34 +62,34 @@ pip install -e ".[dev]"
 simplerig --help
 ```
 
-### 3. 运行第一个工作流
+### 3. 使用方式
 
-SimpleRig 支持两种调用方式：**命令行** 和 **编辑器内自然语言对话**。
+> **重要说明**：SimpleRig 是一个**工作流框架**，需要在 **Cursor 或 OpenCode 编辑器内**使用。CLI 命令主要用于查看状态和统计，而非独立执行开发任务。
 
-#### 方式 A：命令行（CLI）
-
-在你的项目根目录下，直接用自然语言描述你的需求：
-
-```bash
-# 用自然语言描述开发任务，SimpleRig 会自动规划、拆分、并行执行
-simplerig run "实现一个简单的用户登录接口，包含 JWT 认证"
-
-# 更多示例
-simplerig run "重构 utils 模块，提取公共函数并添加单元测试"
-simplerig run "修复 issue #42 中报告的内存泄漏问题"
-```
-
-#### 方式 B：在 Cursor / OpenCode 中对话
-
-如果你使用 Cursor 或 OpenCode 编辑器，可以通过**自然语言聊天**触发工作流：
+#### 在 Cursor / OpenCode 中使用（推荐）
 
 1. **复制 Skill 到你的项目**（见下方"编辑器集成"）
-2. **在 Chat 中直接描述需求**，例如：
+2. **在 Chat 中直接描述开发需求**，例如：
    - "帮我实现一个用户注册功能，要有邮箱验证"
    - "把这个模块重构成单例模式"
    - "给 auth 模块添加完整的单元测试"
 
-编辑器会自动识别 SimpleRig Skill 并调用工作流，无需手动输入命令。
+编辑器 Agent 会读取 SimpleRig Skill，按照框架定义的流程（规划 → 开发 → 验证 → 集成）执行任务。
+
+#### CLI 辅助命令
+
+CLI 用于查看运行状态和统计：
+
+```bash
+# 查看历史运行
+simplerig list
+
+# 查看运行状态
+simplerig status --run-id <id>
+
+# 查看统计报告
+simplerig stats
+```
 
 ## ⚙️ 配置指南
 
@@ -129,16 +129,12 @@ project:
 
 | 命令 | 说明 | 示例 |
 |------|------|------|
-| `simplerig run <需求>` | 运行工作流 | `simplerig run "重构 auth 模块"` |
-| `simplerig status` | 查看运行状态 | `simplerig status --run-id <id>` |
 | `simplerig list` | 列出历史运行 | `simplerig list --limit 5` |
+| `simplerig status` | 查看运行状态 | `simplerig status --run-id <id>` |
 | `simplerig tail` | 实时查看事件流 | `simplerig tail --follow` |
 | `simplerig stats` | 查看统计报告 | `simplerig stats --json` |
 
-**常用参数：**
-- `--dry-run`: 预演模式，仅规划不执行。
-- `--resume`: 从最近一次失败或中断处继续。
-- `--from-stage <stage>`: 从指定阶段（如 `develop`, `verify`）开始。
+> 注：`simplerig run` 命令目前仅生成框架占位文件，实际开发任务需在 Cursor/OpenCode 编辑器内通过 Agent Skills 执行。
 
 ## 📊 统计与产物
 
