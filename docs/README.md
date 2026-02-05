@@ -4,6 +4,7 @@
 
 | 文档 | 说明 |
 |------|------|
+| [architecture.md](architecture.md) | **架构设计**：核心机制、事件模型与调度原理 |
 | [features/stats-spec.md](features/stats-spec.md) | 统计功能技术规格 |
 | [features/stats.feature](features/stats.feature) | 统计相关 BDD 场景（Gherkin） |
 
