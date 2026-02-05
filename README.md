@@ -49,15 +49,32 @@ pip install -e ".[dev]"
 
 ### 3. 运行第一个工作流
 
-在你的项目根目录下：
+SimpleRig 支持两种调用方式：**命令行** 和 **编辑器内自然语言对话**。
+
+#### 方式 A：命令行（CLI）
+
+在你的项目根目录下，直接用自然语言描述你的需求：
 
 ```bash
-# 1. 初始化配置 (可选，复制默认配置)
-# cp /path/to/simplerig/config.yaml ./config.yaml
-
-# 2. 运行任务
+# 用自然语言描述开发任务，SimpleRig 会自动规划、拆分、并行执行
 simplerig run "实现一个简单的用户登录接口，包含 JWT 认证"
+
+# 更多示例
+simplerig run "重构 utils 模块，提取公共函数并添加单元测试"
+simplerig run "修复 issue #42 中报告的内存泄漏问题"
 ```
+
+#### 方式 B：在 Cursor / OpenCode 中对话
+
+如果你使用 Cursor 或 OpenCode 编辑器，可以通过**自然语言聊天**触发工作流：
+
+1. **复制 Skill 到你的项目**（见下方"编辑器集成"）
+2. **在 Chat 中直接描述需求**，例如：
+   - "帮我实现一个用户注册功能，要有邮箱验证"
+   - "把这个模块重构成单例模式"
+   - "给 auth 模块添加完整的单元测试"
+
+编辑器会自动识别 SimpleRig Skill 并调用工作流，无需手动输入命令。
 
 ## ⚙️ 配置指南
 
@@ -136,17 +153,25 @@ simplerig stats
 
 ### Cursor
 
-将 Skill 复制到 Cursor 配置目录，即可在 Chat 中使用 `/simplerig` 指令：
+1. **复制 Skill 到你的项目：**
+   ```bash
+   cp -r .cursor/skills/simplerig /path/to/your/project/.cursor/skills/
+   ```
 
-```bash
-cp -r .cursor/skills/simplerig /path/to/your/project/.cursor/skills/
-```
+2. **在 Cursor Chat 中使用：**
+   - 直接输入开发需求（如 "实现用户认证功能"），Cursor 会自动调用 SimpleRig
+   - 或使用 `/simplerig` 指令显式触发
+
+3. **工作流程：** Cursor Agent 读取 Skill → 理解你的需求 → 调用 SimpleRig 规划任务 → 并行执行开发
 
 ### OpenCode
 
-```bash
-cp -r .opencode/skills/simplerig /path/to/your/project/.opencode/skills/
-```
+1. **复制 Skill 到你的项目：**
+   ```bash
+   cp -r .opencode/skills/simplerig /path/to/your/project/.opencode/skills/
+   ```
+
+2. **在 OpenCode 中使用：** 直接用自然语言描述开发任务即可
 
 ## 📚 文档
 
