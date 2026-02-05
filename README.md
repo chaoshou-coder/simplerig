@@ -150,8 +150,7 @@ cp -r .opencode/skills/simplerig /path/to/your/project/.opencode/skills/
 
 ## 📚 文档
 
-- [功能规格 (Stats)](docs/features/stats-spec.md)
-- [BDD 场景 (Stats)](docs/features/stats.feature)
+- [技术架构文档](docs/architecture.md)
 
 ## 📄 许可证
 
