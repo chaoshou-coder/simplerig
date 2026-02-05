@@ -145,13 +145,17 @@ class LintGuard:
     def _run_tool(self, tool: str, args: List[str], fix: bool = False) -> Dict:
         """运行工具"""
         cmd = [tool] + args
+        timeout = self.config.timeouts.get("tool", None)
+        if timeout is not None and timeout <= 0:
+            timeout = None
         
         try:
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                cwd=self.project_root
+                cwd=self.project_root,
+                timeout=timeout
             )
             
             # 解析输出
@@ -180,6 +184,34 @@ class LintGuard:
                     "returncode": result.returncode
                 }
                 
+        except subprocess.TimeoutExpired:
+            error_msg = f"{tool} timed out after {timeout}s"
+            if tool == self.linter:
+                return {
+                    "issues": [LintIssue(
+                        file="N/A",
+                        line=0,
+                        code=f"{tool.upper()}_TIMEOUT",
+                        message=error_msg,
+                        fixable=False
+                    )],
+                    "fixed": 0,
+                    "stdout": "",
+                    "stderr": error_msg,
+                    "returncode": 124
+                }
+            elif tool == self.formatter:
+                return {
+                    "reformatted": 0,
+                    "stdout": "",
+                    "stderr": error_msg,
+                    "returncode": 124
+                }
+            return {
+                "stdout": "",
+                "stderr": error_msg,
+                "returncode": 124
+            }
         except FileNotFoundError:
             error_msg = f"{tool} not found. Please install it."
             return {

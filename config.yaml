@@ -137,6 +137,8 @@ timeouts:
   tdd_red_phase: 30
   tdd_green_phase: 30
   tdd_max_retries: 3
+  run_lock: 30
+  tool: 300
   
   monitor_stall: 60
   monitor_max_runtime: 600

@@ -7,6 +7,19 @@ description: SimpleRig Skill 驱动工作流。Agent 按阶段执行开发并记
 
 当用户提出开发需求时，按以下流程执行（Agent 必须执行）。
 
+## 交互优先级（避免卡住）
+
+如果用户在执行流程中提出问题或插入讨论：
+
+1. 先回答用户问题
+2. 视情况记录暂停/恢复事件：
+   ```bash
+   simplerig emit run.paused --run-id <run_id> --data "{\"reason\":\"user_question\"}"
+   # 回答问题
+   simplerig emit run.resumed --run-id <run_id>
+   ```
+3. 回到原阶段继续执行
+
 ## 准备阶段
 
 1. **检查安装**：

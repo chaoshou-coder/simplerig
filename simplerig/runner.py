@@ -270,7 +270,15 @@ class StageMachine:
         Returns:
             最终状态
         """
-        with self.lock:
+        config = get_config()
+        lock_timeout = config.timeouts.get("run_lock", 30)
+        if lock_timeout is not None and lock_timeout <= 0:
+            lock_timeout = None
+        
+        if not self.lock.acquire(timeout=lock_timeout):
+            raise TimeoutError(f"获取运行锁超时（{lock_timeout}s）")
+        
+        try:
             # 重建状态
             reconstructor = StateReconstructor(self.run_dir)
             state = reconstructor.reconstruct()
@@ -316,7 +324,6 @@ class StageMachine:
                         self._skip_stage(state, stage, "from_stage 跳过")
             
             # 创建执行上下文
-            config = get_config()
             ctx = StageContext(
                 run_id=self.run_dir.name,
                 run_dir=self.run_dir,
@@ -386,6 +393,8 @@ class StageMachine:
                 state.status = "completed"
             
             return state
+        finally:
+            self.lock.release()
     
     def _skip_stage(self, state: RunState, stage: Stage, reason: str):
         """跳过阶段"""
