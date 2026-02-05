@@ -25,13 +25,13 @@
 
 ### 2. 安装
 
-从 GitHub 克隆并安装：
+在**你的项目目录**下安装 SimpleRig：
 
 ```bash
-git clone https://github.com/chaoshou-coder/simplerig.git
-cd simplerig
+# 进入你的项目目录
+cd /path/to/your/project
 
-# 创建虚拟环境
+# 创建虚拟环境（如果还没有）
 python -m venv .venv
 ```
 
@@ -52,14 +52,31 @@ source .venv/bin/activate
 .venv\Scripts\activate.bat
 ```
 
-安装并验证：
+克隆 SimpleRig 并安装：
 
 ```bash
-# 安装（含开发依赖）
-pip install -e ".[dev]"
+# 克隆到项目目录下（作为子目录）
+git clone https://github.com/chaoshou-coder/simplerig.git
 
-# 验证
+# 安装 simplerig 包
+pip install -e ./simplerig
+
+# 复制配置文件到项目根目录
+cp ./simplerig/config.yaml ./config.yaml  # Linux/macOS
+# Copy-Item .\simplerig\config.yaml .\config.yaml  # Windows PowerShell
+
+# 验证安装
 simplerig --help
+```
+
+安装后的目录结构：
+```
+your-project/
+├── .venv/                # 虚拟环境
+├── .cursor/skills/       # Skill 目录（下一步复制）
+├── config.yaml           # 配置文件
+├── simplerig/            # clone 的仓库
+└── your-code/            # 你的代码
 ```
 
 ### 3. 使用方式
