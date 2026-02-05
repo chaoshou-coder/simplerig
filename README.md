@@ -64,7 +64,7 @@ simplerig --help
 
 ### 3. 使用方式
 
-> **重要说明**：SimpleRig 是一个**工作流框架**，需要在 **Cursor 或 OpenCode 编辑器内**使用。CLI 命令主要用于查看状态和统计，而非独立执行开发任务。
+> **重要说明**：SimpleRig 是一个**Skill 驱动的工作流框架**，需要在 **Cursor 或 OpenCode 编辑器内**使用。编辑器内由 Agent 调用 `simplerig init/emit` 记录事件；CLI 也可手动执行这些命令。
 
 #### 在 Cursor / OpenCode 中使用（推荐）
 
@@ -74,13 +74,29 @@ simplerig --help
    - "把这个模块重构成单例模式"
    - "给 auth 模块添加完整的单元测试"
 
-编辑器 Agent 会读取 SimpleRig Skill，按照框架定义的流程（规划 → 开发 → 验证 → 集成）执行任务。
+3. Agent 会自动执行以下流程并记录事件：
+   ```bash
+   simplerig init "实现用户认证功能"
+   # 规划 → 开发 → 验证 → 完成
+   simplerig emit stage.completed --stage plan --run-id <run_id>
+   simplerig emit stage.completed --stage develop --run-id <run_id>
+   simplerig emit stage.completed --stage verify --run-id <run_id>
+   simplerig emit run.completed --run-id <run_id>
+   ```
+
+编辑器 Agent 会读取 SimpleRig Skill，按照框架定义的流程执行任务，并将产物写入 `.simplerig/runs/<run_id>/artifacts/`。
 
 #### CLI 辅助命令
 
-CLI 用于查看运行状态和统计：
+CLI 可用于初始化 run、记录事件以及查看状态/统计：
 
 ```bash
+# 初始化 run
+simplerig init "实现用户认证功能"
+
+# 记录阶段完成事件
+simplerig emit stage.completed --stage plan --run-id <id>
+
 # 查看历史运行
 simplerig list
 
@@ -129,12 +145,14 @@ project:
 
 | 命令 | 说明 | 示例 |
 |------|------|------|
+| `simplerig init` | 初始化新 run | `simplerig init "需求"` |
+| `simplerig emit` | 记录事件 | `simplerig emit stage.completed --stage plan --run-id <id>` |
 | `simplerig list` | 列出历史运行 | `simplerig list --limit 5` |
 | `simplerig status` | 查看运行状态 | `simplerig status --run-id <id>` |
 | `simplerig tail` | 实时查看事件流 | `simplerig tail --follow` |
 | `simplerig stats` | 查看统计报告 | `simplerig stats --json` |
 
-> 注：`simplerig run` 命令目前仅生成框架占位文件，实际开发任务需在 Cursor/OpenCode 编辑器内通过 Agent Skills 执行。
+> 注：在编辑器内使用 Skill 时，Agent 通过 `init/emit` 记录事件；`simplerig run` 仍可用于本地演示/调试框架阶段机（stub 逻辑）。
 
 ## 📊 统计与产物
 

@@ -1,6 +1,6 @@
 """
 SimpleRig CLI - 命令行入口
-子命令：run/status/tail/help
+子命令：init/emit/run/status/tail/list/stats/help
 """
 import argparse
 import sys
@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from .config import get_config
+from .events import EventWriter
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -20,6 +21,8 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
+  simplerig init "实现用户认证功能"
+  simplerig emit stage.completed --stage plan --run-id 20260205_120000_abc123
   simplerig run "实现用户认证功能"
   simplerig run --resume abc123
   simplerig run --from-stage plan
@@ -42,6 +45,39 @@ def create_parser() -> argparse.ArgumentParser:
     )
     
     subparsers = parser.add_subparsers(dest="command", help="可用命令")
+    
+    # init 子命令
+    init_parser = subparsers.add_parser("init", help="初始化新 run")
+    init_parser.add_argument(
+        "requirement",
+        type=str,
+        nargs="?",
+        help="自然语言需求描述"
+    )
+    
+    # emit 子命令
+    emit_parser = subparsers.add_parser("emit", help="记录事件")
+    emit_parser.add_argument(
+        "event",
+        type=str,
+        help="事件类型 (如 run.started, stage.completed)"
+    )
+    emit_parser.add_argument(
+        "--run-id",
+        type=str,
+        required=True,
+        help="Run ID"
+    )
+    emit_parser.add_argument(
+        "--stage",
+        type=str,
+        help="阶段名称 (stage.* 事件需要)"
+    )
+    emit_parser.add_argument(
+        "--data",
+        type=str,
+        help="附加 JSON 数据 (必须为对象)"
+    )
     
     # run 子命令
     run_parser = subparsers.add_parser("run", help="运行工作流")
@@ -181,6 +217,72 @@ def get_latest_run_id() -> Optional[str]:
     if runs:
         return runs[0].name
     return None
+
+
+def _parse_event_data(data: Optional[str]) -> dict:
+    """解析事件附加数据（JSON 对象）"""
+    if not data:
+        return {}
+    
+    import json
+    try:
+        parsed = json.loads(data)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"无效的 JSON 数据: {exc}") from exc
+    
+    if not isinstance(parsed, dict):
+        raise ValueError("附加数据必须是 JSON 对象")
+    
+    return parsed
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    """执行 init 命令"""
+    if not args.requirement:
+        print("错误：请提供需求描述", file=sys.stderr)
+        return 1
+    
+    run_id = generate_run_id()
+    run_dir = get_runs_dir() / run_id
+    
+    # 创建 run 目录结构
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "artifacts").mkdir(exist_ok=True)
+    (run_dir / "locks").mkdir(exist_ok=True)
+    
+    # 写入 run.started 事件
+    writer = EventWriter(run_dir)
+    writer.emit("run.started", run_id, requirement=args.requirement)
+    
+    print(f"run_id={run_id}")
+    return 0
+
+
+def cmd_emit(args: argparse.Namespace) -> int:
+    """执行 emit 命令"""
+    run_dir = get_runs_dir() / args.run_id
+    if not run_dir.exists():
+        print(f"错误：run_id '{args.run_id}' 不存在", file=sys.stderr)
+        return 1
+    
+    try:
+        data = _parse_event_data(args.data)
+    except ValueError as exc:
+        print(f"错误：{exc}", file=sys.stderr)
+        return 1
+    
+    if args.stage:
+        data["stage"] = args.stage
+    
+    if args.event.startswith("stage.") and "stage" not in data:
+        print("错误：stage.* 事件需要 --stage", file=sys.stderr)
+        return 1
+    
+    writer = EventWriter(run_dir)
+    writer.emit(args.event, args.run_id, **data)
+    
+    print(f"Event recorded: {args.event}")
+    return 0
 
 
 def cmd_run(args: argparse.Namespace) -> int:
@@ -431,6 +533,8 @@ def main(argv: list[str] = None) -> int:
     
     # 分发到子命令
     commands = {
+        "init": cmd_init,
+        "emit": cmd_emit,
         "run": cmd_run,
         "status": cmd_status,
         "tail": cmd_tail,

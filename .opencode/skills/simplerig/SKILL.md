@@ -1,103 +1,78 @@
 ---
 name: simplerig
-description: SimpleRig 多 Agent 工作流框架。在用户提出开发需求时使用，支持 JSONL 事件溯源、任务级并行、断点续传。
+description: SimpleRig Skill 驱动工作流。Agent 按阶段执行开发并记录事件。
 ---
 
-# SimpleRig
+# SimpleRig 工作流
 
-## 何时使用
+当用户提出开发需求时，按以下流程执行（Agent 必须执行）。
 
-- 用户提出完整开发需求时
-- 需要多 Agent 并行开发时
-- 需要断点续传/恢复执行时
-- 需要自动代码风格检查时
+## 准备阶段
 
-## Instructions（Agent 必须执行）
-
-1. **检查安装**：确认 `simplerig` 已安装
+1. **检查安装**：
    ```bash
-   pip show simplerig
+   python -m pip show simplerig
+   ```
+2. **检查配置**：确认项目根目录有 `config.yaml` 或 `SIMPLERIG_CONFIG`
+3. **初始化 run**：
+   ```bash
+   simplerig init "用户的需求描述"
+   # 输出: run_id=20260205_120000_abc123
+   ```
+4. **记录 run_id**：后续命令都需要使用
+
+## 阶段 1: 规划 (plan)
+
+1. 分析用户需求并扫描项目结构
+2. 制定开发计划，包含：
+   - 需要创建的文件
+   - 需要修改的文件
+   - 实现步骤
+3. 将计划保存到 `.simplerig/runs/<run_id>/artifacts/plan.json`
+4. 记录完成事件：
+   ```bash
+   simplerig emit stage.completed --stage plan --run-id <run_id>
    ```
 
-2. **检查配置**：确认项目根目录有 `config.yaml`
+## 阶段 2: 开发 (develop)
 
-3. **获取需求**：如果用户未明确需求，先询问
-
-4. **执行工作流**：
+1. 读取 `plan.json`
+2. 按计划创建/修改文件
+3. 将变更记录到 `code_changes.json`
+4. 记录完成事件：
    ```bash
-   # 新建运行
-   simplerig run "用户的完整需求描述"
-   
-   # 预演模式
-   simplerig run "需求" --dry-run
-   
-   # 从中断恢复
-   simplerig run --resume
-   
-   # 从指定阶段开始
-   simplerig run "需求" --from-stage develop
+   simplerig emit stage.completed --stage develop --run-id <run_id>
    ```
 
-5. **查看状态**：
+## 阶段 3: 验证 (verify)
+
+1. 运行 Lint 检查：`ruff check .`
+2. 运行测试：`pytest`
+3. 将结果保存到 `verify_result.json`
+4. 如果失败，回到阶段 2 修复
+5. 记录完成事件：
    ```bash
-   # 查看运行状态
-   simplerig status
-   
-   # 查看事件流
-   simplerig tail --follow
-   
-   # 列出历史
-   simplerig list
+   simplerig emit stage.completed --stage verify --run-id <run_id>
    ```
 
-6. **反馈结果**：将执行结果摘要反馈给用户
+## 阶段 4: 完成
 
-## Run 目录结构
+1. 汇总所有变更
+2. 向用户报告完成情况
+3. 记录完成事件：
+   ```bash
+   simplerig emit run.completed --run-id <run_id>
+   ```
 
-执行后会创建：
-```
-.simplerig/runs/<run_id>/
-├── events.jsonl      # 事件流（事实源，可审计）
-├── artifacts/        # 产物目录
-│   ├── plan.json           # 规划产物
-│   ├── code_changes.json   # 代码变更
-│   ├── verify_result.json  # 验证结果
-│   └── task_*.result.json  # 任务输出
-└── locks/
-    └── run.lock      # 互斥锁
-```
+## 事件与产物
 
-## 配置检查
-
-执行前请确认：
-- `config.yaml` 存在或 `SIMPLERIG_CONFIG` 已设置
-- 模型配置正确（`models.registry` 和 `models.roles`）
-- 可选：API key（`api.openrouter.key` 或环境变量）
-
-## 核心功能
-
-### 断点续传
-```bash
-# 中断后恢复
-simplerig run --resume
-
-# 从指定 run 恢复
-simplerig run --resume <run_id>
-```
-
-### 任务级并行
-- 无依赖的任务自动并行执行
-- 可配置最大并发数 `parallel.max_agents`
-- 失败隔离：某任务失败不影响其他任务
-
-### 事件溯源
-- 所有操作记录为 `events.jsonl`
-- 可通过事件流重建任何时刻的状态
-- 支持事件过滤：`simplerig tail --filter "task.*"`
-
-## 输出
-
-工作流会输出：
 - 事件日志：`.simplerig/runs/<run_id>/events.jsonl`
 - 产物目录：`.simplerig/runs/<run_id>/artifacts/`
-- 控制台：执行状态、完成阶段、失败阶段
+
+## 断点续传
+
+如果中断，用户说“继续”时：
+
+1. `simplerig status` 查看最近运行状态
+2. `simplerig tail --follow` 查看事件流
+3. 从未完成阶段继续执行
