@@ -23,6 +23,7 @@ def create_parser() -> argparse.ArgumentParser:
 示例:
   simplerig init "实现用户认证功能"
   simplerig emit stage.completed --stage plan --run-id 20260205_120000_abc123
+  simplerig emit llm.called --run-id 20260205_120000_abc123 --prompt-tokens 1200 --completion-tokens 340
   simplerig run "实现用户认证功能"
   simplerig run --resume abc123
   simplerig run --from-stage plan
@@ -77,6 +78,26 @@ def create_parser() -> argparse.ArgumentParser:
         "--data",
         type=str,
         help="附加 JSON 数据 (必须为对象)"
+    )
+    emit_parser.add_argument(
+        "--token-usage",
+        type=str,
+        help="Token 使用量 JSON（对象，含 prompt_tokens/completion_tokens/total_tokens）"
+    )
+    emit_parser.add_argument(
+        "--prompt-tokens",
+        type=int,
+        help="输入 tokens"
+    )
+    emit_parser.add_argument(
+        "--completion-tokens",
+        type=int,
+        help="输出 tokens"
+    )
+    emit_parser.add_argument(
+        "--total-tokens",
+        type=int,
+        help="总 tokens"
     )
     
     # run 子命令
@@ -236,6 +257,46 @@ def _parse_event_data(data: Optional[str]) -> dict:
     return parsed
 
 
+def _parse_token_usage(data: Optional[str]) -> dict:
+    """解析 token_usage JSON（对象）"""
+    if not data:
+        return {}
+    
+    import json
+    try:
+        parsed = json.loads(data)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"无效的 token_usage JSON: {exc}") from exc
+    
+    if not isinstance(parsed, dict):
+        raise ValueError("token_usage 必须是 JSON 对象")
+    
+    return parsed
+
+
+def _merge_token_usage(base: dict, extra: dict) -> dict:
+    """合并并校验 token_usage"""
+    usage = dict(base or {})
+    usage.update(extra or {})
+    
+    # 转换并校验数值
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        if key in usage and usage[key] is not None:
+            try:
+                usage[key] = int(usage[key])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{key} 必须为整数") from exc
+            if usage[key] < 0:
+                raise ValueError(f"{key} 不能为负数")
+    
+    # 自动补全 total_tokens
+    if "total_tokens" not in usage:
+        if "prompt_tokens" in usage or "completion_tokens" in usage:
+            usage["total_tokens"] = int(usage.get("prompt_tokens", 0)) + int(usage.get("completion_tokens", 0))
+    
+    return usage
+
+
 def cmd_init(args: argparse.Namespace) -> int:
     """执行 init 命令"""
     if not args.requirement:
@@ -267,9 +328,35 @@ def cmd_emit(args: argparse.Namespace) -> int:
     
     try:
         data = _parse_event_data(args.data)
+        token_usage_json = _parse_token_usage(args.token_usage)
     except ValueError as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return 1
+    
+    # 合并 token_usage（允许从 --data 与显式参数传入）
+    token_usage_base = {}
+    if "token_usage" in data:
+        if not isinstance(data["token_usage"], dict):
+            print("错误：token_usage 必须是 JSON 对象", file=sys.stderr)
+            return 1
+        token_usage_base = data.get("token_usage", {})
+    
+    token_usage_args = {
+        "prompt_tokens": args.prompt_tokens,
+        "completion_tokens": args.completion_tokens,
+        "total_tokens": args.total_tokens,
+    }
+    token_usage_args = {k: v for k, v in token_usage_args.items() if v is not None}
+    
+    try:
+        token_usage = _merge_token_usage(token_usage_base, token_usage_json)
+        token_usage = _merge_token_usage(token_usage, token_usage_args)
+    except ValueError as exc:
+        print(f"错误：{exc}", file=sys.stderr)
+        return 1
+    
+    if token_usage:
+        data["token_usage"] = token_usage
     
     if args.stage:
         data["stage"] = args.stage
@@ -278,10 +365,31 @@ def cmd_emit(args: argparse.Namespace) -> int:
         print("错误：stage.* 事件需要 --stage", file=sys.stderr)
         return 1
     
+    if args.event == "run.completed" and "stats" not in data:
+        from .stats import collect_stats
+        
+        # 先收集一次统计，用于写入 run.completed 事件
+        run_stats = collect_stats(run_dir)
+        stats_payload = {
+            "total_duration_ms": run_stats.total_duration_ms,
+            "total_token_usage": run_stats.total_token_usage.to_dict(),
+            "stages": {k: v.to_dict() for k, v in run_stats.stages.items()},
+        }
+        if token_usage:
+            stats_payload["total_token_usage"] = token_usage
+        data["stats"] = stats_payload
+    
     writer = EventWriter(run_dir)
     writer.emit(args.event, args.run_id, **data)
     
     print(f"Event recorded: {args.event}")
+    
+    if args.event in ("run.completed", "run.failed", "run.aborted"):
+        from .stats import collect_stats, save_stats
+        
+        run_stats = collect_stats(run_dir)
+        save_stats(run_dir, run_stats)
+        print(run_stats.summary())
     return 0
 
 

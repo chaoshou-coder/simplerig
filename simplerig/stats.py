@@ -99,6 +99,7 @@ class RunStats:
     
     # Token 统计
     total_token_usage: TokenUsage = field(default_factory=TokenUsage)
+    token_recorded: bool = False
     
     # 阶段统计
     stages: Dict[str, StageStats] = field(default_factory=dict)
@@ -119,6 +120,7 @@ class RunStats:
             "total_duration_ms": self.total_duration_ms,
             "total_duration_formatted": format_duration(self.total_duration_ms),
             "total_token_usage": self.total_token_usage.to_dict(),
+            "token_recorded": self.token_recorded,
             "stages": {k: v.to_dict() for k, v in self.stages.items()},
             "tasks": {k: v.to_dict() for k, v in self.tasks.items()},
             "event_count": self.event_count,
@@ -137,9 +139,13 @@ class RunStats:
         # 总体统计
         lines.append("【总体统计】")
         lines.append(f"  总耗时: {format_duration(self.total_duration_ms)}")
-        lines.append(f"  总 Token: {self.total_token_usage.total_tokens:,}")
-        lines.append(f"    - 输入: {self.total_token_usage.prompt_tokens:,}")
-        lines.append(f"    - 输出: {self.total_token_usage.completion_tokens:,}")
+        if self.token_recorded:
+            lines.append(f"  总 Token: {self.total_token_usage.total_tokens:,}")
+            lines.append(f"    - 输入: {self.total_token_usage.prompt_tokens:,}")
+            lines.append(f"    - 输出: {self.total_token_usage.completion_tokens:,}")
+        else:
+            lines.append("  总 Token: 未记录")
+            lines.append("    - 需要记录 llm.called 或阶段/任务 token_usage")
         lines.append("")
         
         # 阶段统计
@@ -148,10 +154,15 @@ class RunStats:
             lines.append(f"  {'阶段':<12} {'状态':<10} {'耗时':<15} {'Token':>10}")
             lines.append("  " + "-" * 50)
             for name, stage in self.stages.items():
+                token_cell = (
+                    f"{stage.token_usage.total_tokens:>10,}"
+                    if self.token_recorded
+                    else f"{'-':>10}"
+                )
                 lines.append(
                     f"  {name:<12} {stage.status:<10} "
                     f"{format_duration(stage.duration_ms):<15} "
-                    f"{stage.token_usage.total_tokens:>10,}"
+                    f"{token_cell}"
                 )
             lines.append("")
         
@@ -161,10 +172,15 @@ class RunStats:
             lines.append(f"  {'任务ID':<20} {'状态':<10} {'耗时':<15} {'Token':>10}")
             lines.append("  " + "-" * 58)
             for task_id, task in self.tasks.items():
+                token_cell = (
+                    f"{task.token_usage.total_tokens:>10,}"
+                    if self.token_recorded
+                    else f"{'-':>10}"
+                )
                 lines.append(
                     f"  {task_id:<20} {task.status:<10} "
                     f"{format_duration(task.duration_ms):<15} "
-                    f"{task.token_usage.total_tokens:>10,}"
+                    f"{token_cell}"
                 )
             lines.append("")
         
@@ -302,6 +318,7 @@ class StatsCollector:
             if "token_usage" in event.data:
                 stage_stats.token_usage = TokenUsage.from_dict(event.data["token_usage"])
                 stats.total_token_usage = stats.total_token_usage + stage_stats.token_usage
+                stats.token_recorded = True
         
         elif event.type == "stage.failed":
             stage_name = event.data.get("stage", "")
@@ -360,6 +377,7 @@ class StatsCollector:
                 if "token_usage" in event.data:
                     task_stats.token_usage = TokenUsage.from_dict(event.data["token_usage"])
                     stats.total_token_usage = stats.total_token_usage + task_stats.token_usage
+                    stats.token_recorded = True
         
         elif event.type == "task.failed":
             task_id = event.data.get("task_id", "")
@@ -374,12 +392,16 @@ class StatsCollector:
         elif event.type == "llm.called":
             token_usage = TokenUsage.from_dict(event.data.get("token_usage", {}))
             stats.total_token_usage = stats.total_token_usage + token_usage
+            stats.token_recorded = True
     
     def _merge_stats_from_event(self, stats: RunStats, event_stats: Dict):
         """从事件中合并统计数据"""
         if "total_token_usage" in event_stats:
             # 使用事件中的统计（可能更准确）
-            stats.total_token_usage = TokenUsage.from_dict(event_stats["total_token_usage"])
+            total = TokenUsage.from_dict(event_stats["total_token_usage"])
+            stats.total_token_usage = total
+            if total.total_tokens or total.prompt_tokens or total.completion_tokens:
+                stats.token_recorded = True
 
 
 def collect_stats(run_dir: Path) -> RunStats:

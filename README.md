@@ -195,6 +195,20 @@ simplerig stats
   develop: 4m, 8.7k tokens
 ```
 
+### Token 统计记录
+
+SimpleRig 不直接调用模型，Token 需要由编辑器/Agent 写入事件：
+
+```bash
+# 记录一次 LLM 调用
+simplerig emit llm.called --run-id <id> --prompt-tokens 1200 --completion-tokens 340
+
+# 或在阶段完成时带上 token_usage
+simplerig emit stage.completed --stage develop --run-id <id> --prompt-tokens 800 --completion-tokens 120
+```
+
+> 提示：如果没有写入 token_usage，`simplerig stats` 会显示“未记录”。
+
 ## 🧩 编辑器集成
 
 ### Cursor

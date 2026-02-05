@@ -34,7 +34,7 @@ graph TD
 
     subgraph Infrastructure [基础设施]
         Tools["LintGuard / Tests"]
-        FS["文件系统 (.simplerig)"]
+        FS["文件系统 (simplerig_data)"]
     end
 
     CLI --> StageMachine
@@ -81,6 +81,9 @@ SimpleRig 的“事实源（Source of Truth）”不是内存中的对象，而�
     *   **可恢复性**：重读 `events.jsonl` 即可重建 Run 状态。
     *   **可观测性**：`simplerig tail` 直接消费事件流。
     *   **解耦统计**：统计与业务逻辑分离，仅消费事件。
+*   **Token 记录**：
+    *   SimpleRig 不直接调用模型，Token 需要由编辑器/Agent 写入事件
+    *   记录方式：`llm.called` 事件，或在 `stage.completed/task.completed` 中写入 `token_usage`
 
 ### 2.2 阶段机与阶段处理器 (Stage Machine)
 
@@ -120,7 +123,7 @@ SimpleRig 默认使用四阶段流水线：`plan → develop → verify → inte
 
 ## 3. 数据流与产物
 
-工作流执行过程中会产生多种数据，分层存储于 `.simplerig/runs/<run_id>/`：
+工作流执行过程中会产生多种数据，分层存储于 `simplerig_data/runs/<run_id>/`：
 
 | 目录/文件 | 说明 | 格式 |
 |---|---|---|

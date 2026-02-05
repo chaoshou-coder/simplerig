@@ -51,7 +51,8 @@ description: SimpleRig Skill 驱动工作流。Agent 按阶段执行开发并记
 
 1. 运行 Lint 检查：`ruff check .`
 2. 运行测试：`pytest`
-3. 将结果保存到 `verify_result.json`
+   - 若返回 exit code 5（未收集到测试），视为跳过，不视为失败
+3. 将结果保存到 `verify_result.json`（无测试时标记为跳过）
 4. 如果失败，回到阶段 2 修复
 5. 记录完成事件：
    ```bash
@@ -71,6 +72,18 @@ description: SimpleRig Skill 驱动工作流。Agent 按阶段执行开发并记
 
 - 事件日志：`simplerig_data/runs/<run_id>/events.jsonl`
 - 产物目录：`simplerig_data/runs/<run_id>/artifacts/`
+
+## Token 统计（可选但推荐）
+
+如果能从编辑器获得 Token，用事件记录真实使用量：
+
+```bash
+# 记录一次 LLM 调用
+simplerig emit llm.called --run-id <run_id> --prompt-tokens 1200 --completion-tokens 340
+
+# 或在阶段完成事件里附带
+simplerig emit stage.completed --stage develop --run-id <run_id> --prompt-tokens 800 --completion-tokens 120
+```
 
 ## 命令备用方式
 
