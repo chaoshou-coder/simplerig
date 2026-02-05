@@ -104,8 +104,9 @@ SimpleRig 的强大之处在于 `config.yaml`。你可以定义自己的 AI 团�
 ```yaml
 # config.yaml 示例
 
-# 1. 定义模型 (支持 Cursor 内置模型或外部 API)
+# 模型配置
 models:
+  # 模型注册表
   registry:
     cursor/gpt-5.2-high:
       provider: "cursor"
@@ -113,18 +114,17 @@ models:
     opencode/kimi-k2.5:
       provider: "api"
       context_limit: 8000
-
-# 2. 分配角色
+  # 角色分配
   roles:
     architect: "cursor/gpt-5.2-high"  # 架构师
-    dev: "cursor/gpt-5.2-high"        # 开发人员 (任务将按此模型的上下文限制拆分)
+    dev: "cursor/gpt-5.2-high"        # 开发 (任务按此模型上下文拆分)
 
-# 3. 配置工具链
+# 工具链配置
 tools:
   linter: "ruff"
   test_runner: "pytest"
 
-# 4. 定义项目路径
+# 项目路径
 project:
   source_dirs: ["src", "lib"]
 ```
@@ -135,7 +135,7 @@ project:
 
 | 命令 | 说明 | 示例 |
 |------|------|------|
-| `simplerig run <需?>` | 运行工作流 | `simplerig run "重构 auth 模块"` |
+| `simplerig run <需求>` | 运行工作流 | `simplerig run "重构 auth 模块"` |
 | `simplerig status` | 查看运行状态 | `simplerig status --run-id <id>` |
 | `simplerig list` | 列出历史运行 | `simplerig list --limit 5` |
 | `simplerig tail` | 实时查看事件流 | `simplerig tail --follow` |
