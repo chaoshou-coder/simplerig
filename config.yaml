@@ -1,0 +1,106 @@
+# SimpleRig Configuration
+# 所有硬编码改为可配置
+
+# 模型配置
+models:
+  # 从 config 读取，不再硬编码
+  registry:
+    opencode/kimi-k2.5-free:
+      context_limit: 8000
+      performance_degradation_point: 0.70
+      optimal_context: 4000
+      cost_per_1k: 0.0
+      strengths: ["code_gen", "text_analysis", "simple_tasks"]
+      
+    opencode/qwen2.5-coder-32b-instruct:
+      context_limit: 32000
+      performance_degradation_point: 0.75
+      optimal_context: 16000
+      cost_per_1k: 0.0
+      strengths: ["code_gen", "technical_tasks"]
+      
+    openai/gpt-5.2-codex:
+      context_limit: 128000
+      performance_degradation_point: 0.80
+      optimal_context: 64000
+      cost_per_1k: 0.002
+      strengths: ["complex_reasoning", "reliable", "long_context"]
+  
+  # 角色分配（从 config 读取）
+  roles:
+    architect: "openai/gpt-5.2-codex"
+    planner: "openai/gpt-5.2-codex"
+    dev: "opencode/kimi-k2.5-free"
+    verifier: "opencode/kimi-k2.5-free"
+    rescue: "openai/gpt-5.2-codex"
+
+# API 配置
+api:
+  openrouter:
+    base_url: "https://openrouter.ai/api/v1"
+    key: "${OPENROUTER_API_KEY}"
+  moonshot:
+    base_url: "https://api.moonshot.cn/v1"
+    key: "${MOONSHOT_API_KEY}"
+
+# 路径配置（不再硬编码 ./.workflow）
+paths:
+  # 使用绝对路径或相对项目根的路径
+  database: "${SIMPLERIG_DB:-./.simplerig/memory.db}"
+  logs: "${SIMPLERIG_LOGS:-./.simplerig/logs}"
+  temp: "${SIMPLERIG_TEMP:-./.simplerig/temp}"
+  
+# 项目结构（可配置，不再硬编码 src/ tests/）
+project:
+  source_dirs:
+    - "src"
+    - "lib"
+  test_dirs:
+    - "tests"
+    - "test"
+  
+# 工具链配置（可配置，不再硬编码 ruff/black/pytest）
+tools:
+  linter: "ruff"  # 或 "flake8", "pylint"
+  formatter: "black"  # 或 "autopep8", "yapf"
+  test_runner: "pytest"  # 或 "unittest", "nose"
+  
+  # 各工具的命令行参数
+  linter_args: ["check", "--fix"]
+  formatter_args: []
+  test_runner_args: ["-v"]
+
+# 超时和重试配置（可配置）
+timeouts:
+  tdd_red_phase: 30
+  tdd_green_phase: 30
+  tdd_max_retries: 3
+  
+  monitor_stall: 60
+  monitor_max_runtime: 600
+  monitor_max_restarts: 2
+  monitor_poll_interval: 5
+  
+  api_request: 120
+  api_retry_backoff: [1, 2, 4, 8]
+
+# 并行配置
+parallel:
+  default_agents: 3
+  max_agents: 5
+  # 任务分组数（不再硬编码 3）
+  task_groups: 3
+
+# 预算控制
+budget:
+  daily_limit: 20.0  # $20/day
+  per_task_limit: 0.10  # $0.10/task
+  
+# 日志和可观测性
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  # 日志保留数量（不再硬编码 10）
+  max_history: 50
+  # 是否输出到 stdout
+  stdout: true
