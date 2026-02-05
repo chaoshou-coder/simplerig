@@ -20,6 +20,7 @@ ENV/
 
 # SimpleRig 运行时（含本地 DB、运行产物，勿提交）
 simplerig_data/
+.simplerig/
 
 # 测试（勿提交）
 tests/

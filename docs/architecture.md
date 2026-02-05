@@ -1,44 +1,52 @@
 # SimpleRig 技术架构文档
 
-> 版本: 1.0.0
-> 更新日期: 2026-02-05
+> 版本: 1.1.0
+> 更新日期: 2026-02-06
 
 ## 1. 架构概览
 
-SimpleRig 是一个基于 **Event Sourcing（事件溯源）** 的多 Agent 工作流框架。与传统的状态机框架不同，SimpleRig 将所有状态变更记录为不可变的事件流，从而实现了审计、回放、断点续传和精确的统计分析。
+SimpleRig 是一个基于 **Event Sourcing（事件溯源）** 的多阶段工作流框架。LLM 由编辑器（Cursor / OpenCode）提供，SimpleRig 负责 **事件记录、产物管理、断点续传与可观测性**。编辑器内 Agent 通过 Skill 指令调用 CLI（`init/emit`）记录事件；`simplerig run` 仍保留为本地阶段机演示/调试入口。
+
+### 交互入口
+
+- **编辑器 Agent**：读取 Skill，按阶段执行开发，并用 `simplerig init/emit` 记录事件
+- **CLI**：提供 `init/emit/status/tail/list/stats`；`run` 用于演示阶段机（stub 逻辑）
 
 ### 核心组件分层
 
 ```mermaid
 graph TD
-    User["用户 / CLI"] --> API["SimpleRig API"]
-    
+    User["用户"] --> Agent["Cursor/OpenCode Agent"]
+    User --> CLI["SimpleRig CLI"]
+    Agent --> Skill["Skill 指令"]
+    Skill --> CLI
+
     subgraph Core [核心层]
-        Planner["智能规划器"]
-        Scheduler["任务调度器"]
-        Runner["任务执行器"]
-    end
-    
-    subgraph State [状态层]
-        EventManager["事件管理器"]
-        ArtifactStore["产物存储"]
-        LockManager["分布式锁"]
-    end
-    
-    subgraph Infrastructure [基础设施]
-        LLM["模型注册表"]
-        Tools["工具链"]
-        FS["文件系统"]
+        StageMachine["StageMachine"]
+        Scheduler["ParallelScheduler (可选)"]
     end
 
-    API --> Planner
-    API --> Scheduler
-    Planner --> Scheduler
-    Scheduler --> Runner
-    Runner --> EventManager
-    Runner --> Tools
-    Runner --> LLM
+    subgraph State [状态层]
+        EventManager["EventWriter/Reader"]
+        ArtifactStore["ArtifactStore"]
+        LockManager["RunLock"]
+    end
+
+    subgraph Infrastructure [基础设施]
+        Tools["LintGuard / Tests"]
+        FS["文件系统 (.simplerig)"]
+    end
+
+    CLI --> StageMachine
+    CLI --> EventManager
+    StageMachine --> EventManager
+    StageMachine --> ArtifactStore
+    StageMachine --> Tools
+    Scheduler --> EventManager
+    Scheduler --> ArtifactStore
     EventManager --> FS
+    ArtifactStore --> FS
+    LockManager --> FS
 ```
 
 ## 2. 核心机制详解
@@ -51,33 +59,44 @@ SimpleRig 的“事实源（Source of Truth）”不是内存中的对象，而�
 *   **事件结构**：
     ```json
     {
-      "seq": 105,
-      "type": "task.completed",
-      "timestamp": "2026-02-05T10:00:00Z",
-      "run_id": "abc-123",
+      "seq": 12,
+      "type": "stage.completed",
+      "timestamp": "2026-02-06T08:10:00+00:00",
+      "run_id": "20260206_081000_ab12cd34",
       "data": {
-        "task_id": "task_auth_01",
-        "result": "success",
-        "output_files": ["src/auth.py"]
+        "stage": "plan",
+        "outputs": [
+          {
+            "ref": "artifacts/plan.json",
+            "sha256": "…",
+            "size": 1234,
+            "mime": "application/json"
+          }
+        ],
+        "duration_ms": 1200
       }
     }
     ```
 *   **优势**：
-    *   **可恢复性**：程序崩溃后，只需重读 `events.jsonl` 即可完美重建内存状态。
-    *   **可观测性**：`simplerig tail` 实际上就是实时读取这个文件。
-    *   **解耦统计**：统计模块只需消费事件流，无需侵入业务逻辑。
+    *   **可恢复性**：重读 `events.jsonl` 即可重建 Run 状态。
+    *   **可观测性**：`simplerig tail` 直接消费事件流。
+    *   **解耦统计**：统计与业务逻辑分离，仅消费事件。
 
-### 2.2 智能任务规划 (Context-Aware Planning)
+### 2.2 阶段机与阶段处理器 (Stage Machine)
 
-为了解决“规划出的任务太大，执行模型吃不下”的问题，SimpleRig 引入了基于执行模型能力的规划机制。
+SimpleRig 默认使用四阶段流水线：`plan → develop → verify → integrate`。阶段机负责事件记录与产物校验：
 
-1.  **读取配置**：获取 `models.roles.dev` 指向的执行模型（如 `cursor/gpt-5.2-codex`）。
-2.  **获取约束**：读取该模型的 `context_limit` 和 `safe_limit`（通常为上限的 50%-70%）。
-3.  **动态Prompt**：在规划阶段，Prompt 会显式包含：“请将任务拆分为若干子任务，每个子任务涉及的代码量和上下文不得超过 X tokens”。
+*   **StageMachine**：按顺序执行阶段，写入 `stage.*` 事件
+*   **ArtifactStore**：写入产物并计算 SHA256，用于跳过已完成阶段
+*   **阶段输出**：
+    * `plan.json`：规划结果（当前为 stub 实现）
+    * `code_changes.json`：变更记录（当前为 stub 实现）
+    * `verify_result.json`：Lint/Test 结果
+    * `integration_result.json`：集成结果（当前为 stub 实现）
 
 ### 2.3 任务调度与并行 (DAG Scheduler)
 
-调度器维护一个内存中的 DAG（有向无环图）。
+调度器维护一个内存中的 DAG（有向无环图），当前作为独立模块存在，可用于执行规划阶段产生的任务列表。
 
 *   **状态流转**：
     *   `PENDING`: 等待前置依赖完成。
@@ -93,38 +112,43 @@ SimpleRig 的“事实源（Source of Truth）”不是内存中的对象，而�
 
 得益于事件溯源，断点续传的实现非常优雅：
 
-1.  用户执行 `simplerig run --resume`。
-2.  系统读取 `events.jsonl`，在内存中重放所有事件。
-3.  重放结束后，调度器检查 DAG 中所有任务的状态。
-4.  **跳过**已 `COMPLETED` 的任务。
-5.  **重置** `RUNNING`（但实际已中断）的任务为 `READY`。
-6.  继续调度循环。
+1.  用户执行 `simplerig run --resume` 或 `--from-stage`。
+2.  系统读取 `events.jsonl` 重建 `RunState`。
+3.  对已完成阶段进行产物校验，产物完整则跳过。
+4.  未完成阶段继续执行；失败阶段在恢复时重新执行。
+5.  编辑器 Skill 模式下，可通过 `simplerig status/tail` 追踪状态并继续阶段流程。
 
 ## 3. 数据流与产物
 
-工作流执行过程中会产生多种数据，分层存储于 `simplerig_data/runs/<run_id>/`：
+工作流执行过程中会产生多种数据，分层存储于 `.simplerig/runs/<run_id>/`：
 
 | 目录/文件 | 说明 | 格式 |
 |---|---|---|
 | `events.jsonl` | **核心**：完整的操作流水日志 | JSONL |
-| `artifacts/plan.json` | 架构师/规划师生成的原始计划 | JSON |
-| `artifacts/code_changes.json` | 记录所有文件的修改差异 (Diff) | JSON |
-| `artifacts/verify_result.json` | 测试运行器和 Linter 的输出 | JSON |
-| `artifacts/stats.json` | 运行结束时生成的统计摘要 | JSON |
-| `locks/run.lock` | 防止同一 Run ID 被并发写入的文件锁 | Empty File |
+| `artifacts/plan.json` | 规划产物（当前为 stub） | JSON |
+| `artifacts/code_changes.json` | 变更记录（当前为 stub） | JSON |
+| `artifacts/verify_result.json` | Lint/Test 结果 | JSON |
+| `artifacts/integration_result.json` | 集成结果（当前为 stub） | JSON |
+| `artifacts/task_*.result.json` | 并行任务输出（可选） | JSON |
+| `artifacts/stats.json` | 统计摘要 | JSON |
+| `locks/run.lock` | Run 级文件锁 | Empty File |
 
 ## 4. 扩展性设计
 
-### 4.1 模型适配器 (Model Adapters)
+### 4.1 Skill 驱动接口
 
-SimpleRig 通过 Adapter 模式屏蔽了不同 LLM Provider 的差异：
+Skill 定义“阶段流程 + 事件记录”，Agent 只需按流程调用：
 
-*   **OpenAI/Compatible API**：标准的 Request/Response 处理。
-*   **Cursor Native**：通过特殊的伪协议或本地 Agent 交互（依赖 Cursor IDE 环境）。
+* `simplerig init`：初始化 run 并写入 `run.started`
+* `simplerig emit`：记录 `stage.*` / `run.completed` 等事件
 
-### 4.2 工具链抽象 (Toolchain Abstraction)
+### 4.2 模型配置与角色映射
 
-Linter 和 Test Runner 是可插拔的。只要在 `config.yaml` 中配置了对应的命令格式，理论上支持任意语言的工具链：
+`config.yaml` 支持模型注册与角色映射，但 **模型调用由编辑器负责**。当前配置主要用于规划阶段的约束与未来扩展。
+
+### 4.3 工具链抽象 (Toolchain Abstraction)
+
+Lint 与 Test Runner 可插拔，只需在 `config.yaml` 中配置对应命令格式：
 
 ```yaml
 tools:
