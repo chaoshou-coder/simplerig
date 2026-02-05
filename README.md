@@ -25,29 +25,7 @@
 
 ### 2. 安装
 
-#### 方式 A：从 PyPI 安装（推荐用户）
-
-```bash
-# 1. 创建并激活虚拟环境（推荐）
-python -m venv .venv
-
-# Linux/macOS:
-source .venv/bin/activate
-# Windows PowerShell:
-# .venv\Scripts\Activate
-# Windows CMD:
-# .venv\Scripts\activate.bat
-
-# 2. 安装 SimpleRig
-pip install simplerig
-
-# 3. 验证安装
-simplerig --help
-```
-
-#### 方式 B：从源码安装（推荐开发者）
-
-如果你需要修改源码或参与贡献：
+从 GitHub 克隆并安装：
 
 ```bash
 git clone https://github.com/chaoshou-coder/simplerig.git
@@ -55,17 +33,33 @@ cd simplerig
 
 # 创建虚拟环境
 python -m venv .venv
+```
 
-# 激活虚拟环境
-# Linux/macOS:
+激活虚拟环境：
+
+```bash
+# Linux/macOS
 source .venv/bin/activate
-# Windows PowerShell:
-# .venv\Scripts\Activate
-# Windows CMD:
-# .venv\Scripts\activate.bat
+```
 
-# 安装开发依赖
+```powershell
+# Windows PowerShell
+.venv\Scripts\Activate
+```
+
+```cmd
+# Windows CMD
+.venv\Scripts\activate.bat
+```
+
+安装并验证：
+
+```bash
+# 安装（含开发依赖）
 pip install -e ".[dev]"
+
+# 验证
+simplerig --help
 ```
 
 ### 3. 运行第一个工作流
