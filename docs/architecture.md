@@ -71,7 +71,7 @@ SimpleRig 的“事实源（Source of Truth）”不是内存中的对象，而�
 
 为了解决“规划出的任务太大，执行模型吃不下”的问题，SimpleRig 引入了基于执行模型能力的规划机制。
 
-1.  **读取配置**：获取 `roles.dev` 指向的执行模型（如 `cursor/gpt-5.2-codex`）。
+1.  **读取配置**：获取 `models.roles.dev` 指向的执行模型（如 `cursor/gpt-5.2-codex`）。
 2.  **获取约束**：读取该模型的 `context_limit` 和 `safe_limit`（通常为上限的 50%-70%）。
 3.  **动态Prompt**：在规划阶段，Prompt 会显式包含：“请将任务拆分为若干子任务，每个子任务涉及的代码量和上下文不得超过 X tokens”。
 
