@@ -11,24 +11,24 @@ SimpleRig 是一个基于 **Event Sourcing（事件溯源）** 的多 Agent 工�
 
 ```mermaid
 graph TD
-    User[用户 / CLI] --> API[SimpleRig API / CLI Entry]
+    User["用户 / CLI"] --> API["SimpleRig API"]
     
     subgraph Core [核心层]
-        Planner[智能规划器]
-        Scheduler[任务调度器]
-        Runner[任务执行器]
+        Planner["智能规划器"]
+        Scheduler["任务调度器"]
+        Runner["任务执行器"]
     end
     
     subgraph State [状态层]
-        EventManager[事件管理器]
-        ArtifactStore[产物存储]
-        LockManager[分布式锁]
+        EventManager["事件管理器"]
+        ArtifactStore["产物存储"]
+        LockManager["分布式锁"]
     end
     
     subgraph Infrastructure [基础设施]
-        LLM[模型注册表 (Cursor/API)]
-        Tools[工具链 (Ruff/Pytest)]
-        FS[文件系统]
+        LLM["模型注册表"]
+        Tools["工具链"]
+        FS["文件系统"]
     end
 
     API --> Planner
