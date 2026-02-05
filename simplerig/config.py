@@ -15,8 +15,14 @@ class ModelConfig:
     context_limit: int
     performance_degradation_point: float
     optimal_context: int
-    cost_per_1k: float
     strengths: list
+    # 可选字段
+    cost_per_1k: float = 0.0
+    cost_per_1k_input: float = 0.0
+    cost_per_1k_output: float = 0.0
+    provider: str = "cursor"
+    tier: str = "standard"
+    max_output: int = 0
     
     @property
     def safe_limit(self) -> int:
@@ -68,8 +74,8 @@ class Config:
             print("Using default configuration")
             return cls._default()
         
-        # 2. 加载 YAML
-        with open(path) as f:
+        # 2. 加载 YAML (使用 UTF-8 编码)
+        with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         
         # 3. 解析配置

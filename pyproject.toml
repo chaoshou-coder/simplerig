@@ -8,7 +8,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0.0", "black", "ruff"]
+dev = ["pytest>=7.0.0", "pytest-bdd", "black", "ruff"]
 
 [project.scripts]
 simplerig = "simplerig.cli:main"

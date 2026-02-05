@@ -1,12 +1,55 @@
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
+*.egg
 *.egg-info/
+.eggs/
+dist/
+build/
+*.manifest
 .env
+.env.local
+.env.*.local
+*.log
 
-# SimpleRig
+# 虚拟环境（勿提交）
+.venv/
+venv/
+ENV/
+
+# SimpleRig 运行时（含本地 DB、运行产物，勿提交）
 .simplerig/
 
-# IDE
+# 测试（勿提交）
+tests/
+
+# 测试与质量
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+.tox/
+nox/
+
+# 隐私与敏感（勿提交到 GitHub）
+*.key
+*.pem
+secrets/
+.credentials
+
+# IDE / 编辑器
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+
+# 系统与临时
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+.cursor/plans/

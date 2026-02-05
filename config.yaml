@@ -1,11 +1,55 @@
 # SimpleRig Configuration
-# 所有硬编码改为可配置
 
 # 模型配置
 models:
-  # 从 config 读取，不再硬编码
+  # 默认 provider: cursor (直接使用 Cursor 内置模型) 或 api (调用外部 API)
+  default_provider: "cursor"
+  
+  # 从 config 读取
+  # 数据来源：
+  #   - GPT-5.2 官方: https://llm-stats.com/blog/research/gpt-5-2-launch (400k context, 128k output)
+  #   - Cursor 文档: https://docs.cursor.com/models (GPT-5.2/Codex 显示 272k)
+  #   - "extra high", "high" 等等级名称：用户自定义，对应 Cursor 消耗等级
+  #   - performance_degradation_point: 基于 RULER benchmark (NVIDIA, 2024) 和 ACL 2025 研究
+  #     - 参考: https://arxiv.org/html/2404.06654v3
+  #     - GPT-4 在 RULER 中: 声称 128K, 有效长度 64K (50%), 128K时性能降至81.2%
+  #     - 研究显示: 大多数模型在 ~50% 上下文时开始明显性能下滑
+  #     - GPT-5.2 无直接 RULER 数据(发布晚于测试), 基于 GPT-4 表现推算
   registry:
+    # ===== Cursor 内置模型 (无需 API，直接在 Cursor 中使用) =====
+    # GPT-5.2 Codex: 专为代码生成、bug修复、UI生成优化
+    cursor/gpt-5.2-codex-extra-high:
+      provider: "cursor"
+      context_limit: 272000  # Cursor 文档实际显示值
+      # 基于 RULER benchmark: GPT-4 有效长度约为声称的 50%
+      # GPT-5.2 可能更好, 但保守估计 0.50 作为性能拐点
+      performance_degradation_point: 0.50  # RULER benchmark 推算
+      optimal_context: 100000  # 保守取 ~37%, 确保高质量输出
+      cost_per_1k: 0.0  # Cursor 订阅内使用
+      strengths: ["code_gen", "bug_fixing", "ui_generation", "refactoring"]
+      tier: "extra_high"  # 用户自定义等级名
+      
+    cursor/gpt-5.2-high:
+      provider: "cursor"
+      context_limit: 272000
+      performance_degradation_point: 0.50  # RULER benchmark 推算
+      optimal_context: 100000  # 保守取 ~37%
+      cost_per_1k: 0.0
+      strengths: ["architecture", "planning", "complex_reasoning"]
+      tier: "high"
+      
+    cursor/gpt-5.2:
+      provider: "cursor"
+      context_limit: 272000
+      performance_degradation_point: 0.50  # RULER benchmark 推算
+      optimal_context: 100000  # 保守取 ~37%
+      cost_per_1k: 0.0
+      strengths: ["verification", "review", "general_tasks"]
+      tier: "standard"
+    
+    # ===== 外部 API 模型 (备用) =====
     opencode/kimi-k2.5-free:
+      provider: "api"
       context_limit: 8000
       performance_degradation_point: 0.70
       optimal_context: 4000
@@ -13,6 +57,7 @@ models:
       strengths: ["code_gen", "text_analysis", "simple_tasks"]
       
     opencode/qwen2.5-coder-32b-instruct:
+      provider: "api"
       context_limit: 32000
       performance_degradation_point: 0.75
       optimal_context: 16000
@@ -20,21 +65,29 @@ models:
       strengths: ["code_gen", "technical_tasks"]
       
     openai/gpt-5.2-codex:
-      context_limit: 128000
-      performance_degradation_point: 0.80
-      optimal_context: 64000
-      cost_per_1k: 0.002
-      strengths: ["complex_reasoning", "reliable", "long_context"]
+      provider: "api"
+      context_limit: 400000  # GPT-5.2 官方: 400k input
+      max_output: 128000     # GPT-5.2 官方: 128k output
+      # 基于 RULER benchmark (NVIDIA 2024): 
+      # - GPT-4 有效长度 = 声称的 50% (64K/128K)
+      # - 大多数模型在 50% 上下文后性能下滑 13.9%-85%
+      # - GPT-5.2 无直接数据, 保守取 0.50
+      performance_degradation_point: 0.50  # RULER benchmark 推算
+      optimal_context: 150000  # 保守取 ~37.5%, 参考 GPT-4 表现
+      cost_per_1k_input: 0.00175   # $1.75/M input (官方)
+      cost_per_1k_output: 0.014    # $14/M output (官方)
+      strengths: ["complex_reasoning", "reliable", "long_context", "code_gen"]
   
   # 角色分配（从 config 读取）
+  # 现在使用 Cursor 内置模型进行开发
   roles:
-    architect: "openai/gpt-5.2-codex"
-    planner: "openai/gpt-5.2-codex"
-    dev: "opencode/kimi-k2.5-free"
-    verifier: "opencode/kimi-k2.5-free"
-    rescue: "openai/gpt-5.2-codex"
+    architect: "cursor/gpt-5.2-high"        # GPT5.2 high - 架构设计
+    planner: "cursor/gpt-5.2-high"          # GPT5.2 high - 任务规划
+    dev: "cursor/gpt-5.2-codex-extra-high"  # GPT5.2 codex extra high - 开发实现
+    verifier: "cursor/gpt-5.2"              # GPT5.2 - 验证检查
+    rescue: "cursor/gpt-5.2-codex-extra-high"  # GPT5.2 codex extra high - 救援修复
 
-# API 配置
+# API 配置 (仅在使用 api provider 时需要)
 api:
   openrouter:
     base_url: "https://openrouter.ai/api/v1"
@@ -42,6 +95,15 @@ api:
   moonshot:
     base_url: "https://api.moonshot.cn/v1"
     key: "${MOONSHOT_API_KEY}"
+  
+  # Cursor 模型配置 (通过 Cursor Agent/Task 工具调用)
+  cursor:
+    # Cursor 内置模型不需要 API key，直接通过 Cursor 的 Task 工具调用
+    # 这里配置的是调用参数
+    task_model_mapping:
+      extra_high: "fast"  # Task 工具的 model 参数 (如需要可扩展)
+      high: "fast"
+      standard: "fast"
 
 # 路径配置（不再硬编码 ./.workflow）
 paths:
