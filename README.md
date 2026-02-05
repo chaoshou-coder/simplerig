@@ -175,8 +175,15 @@ simplerig stats
 ### Cursor
 
 1. **复制 Skill 到你的项目：**
+
    ```bash
+   # Linux/macOS
    cp -r .cursor/skills/simplerig /path/to/your/project/.cursor/skills/
+   ```
+
+   ```powershell
+   # Windows PowerShell
+   Copy-Item -Recurse .cursor\skills\simplerig \path\to\your\project\.cursor\skills\
    ```
 
 2. **在 Cursor Chat 中使用：**
@@ -188,8 +195,15 @@ simplerig stats
 ### OpenCode
 
 1. **复制 Skill 到你的项目：**
+
    ```bash
+   # Linux/macOS
    cp -r .opencode/skills/simplerig /path/to/your/project/.opencode/skills/
+   ```
+
+   ```powershell
+   # Windows PowerShell
+   Copy-Item -Recurse .opencode\skills\simplerig \path\to\your\project\.opencode\skills\
    ```
 
 2. **在 OpenCode 中使用：** 直接用自然语言描述开发任务即可
