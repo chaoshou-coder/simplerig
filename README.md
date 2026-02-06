@@ -126,37 +126,39 @@ simplerig stats
 
 ## ⚙️ 配置指南
 
-SimpleRig 的强大之处在于 `config.yaml`。你可以定义自己的 AI 团队：
+SimpleRig 的强大之处在于 `config.yaml`。你可以定义自己的 AI 团队与模型角色：
 
 ```yaml
 # config.yaml 示例
 
-# 模型配置
 models:
-  # 模型注册表
+  default_provider: "cursor"
   registry:
-    cursor/gpt-5.2-high:
+    cursor/opus-4.6-max:    # 架构/规划/救援
+      provider: "cursor"
+      context_limit: 200000
+    cursor/auto:            # 验证（Cursor 自动选模型）
+      provider: "cursor"
+      context_limit: 200000
+    cursor/gpt-5.2-codex-extra-high:
       provider: "cursor"
       context_limit: 272000
-    opencode/kimi-k2.5:
-      provider: "api"
-      context_limit: 8000
-  # 角色分配
   roles:
-    architect: "cursor/gpt-5.2-high"  # 架构师
-    dev: "cursor/gpt-5.2-high"        # 开发 (任务按此模型上下文拆分)
+    architect: "cursor/opus-4.6-max"   # 架构设计
+    planner: "cursor/opus-4.6-max"     # 任务规划
+    dev: "cursor/gpt-5.2-codex-extra-high"  # 开发实现（任务按此模型上下文拆分）
+    verifier: "cursor/auto"            # 验证检查
+    rescue: "cursor/opus-4.6-max"     # 救援修复
 
-# 工具链配置
 tools:
   linter: "ruff"
   test_runner: "pytest"
 
-# 项目路径
 project:
   source_dirs: ["src", "lib"]
 ```
 
-更多配置详情请参考仓库内的 [config.yaml](./config.yaml)。
+更多配置详情（API、超时、并行等）请参考仓库内的 [config.yaml](./config.yaml)。
 
 ## 🛠️ CLI 命令行参考
 
@@ -197,7 +199,7 @@ simplerig stats
 
 ### Token 统计记录
 
-SimpleRig 不直接调用模型，Token 需要由编辑器/Agent 写入事件：
+统计逻辑已实现（按阶段/任务/Run 汇总），但 **SimpleRig 不直接调用模型**，Token 数据需要由编辑器或 Agent 写入事件后才会显示：
 
 ```bash
 # 记录一次 LLM 调用
@@ -207,7 +209,7 @@ simplerig emit llm.called --run-id <id> --prompt-tokens 1200 --completion-tokens
 simplerig emit stage.completed --stage develop --run-id <id> --prompt-tokens 800 --completion-tokens 120
 ```
 
-> 提示：如果没有写入 token_usage，`simplerig stats` 会显示“未记录”。
+若从未写入任何 token 数据，`simplerig stats` 会显示「未记录」或 0。Skill 中可要求 Agent 在完成阶段时尽量附带 `--prompt-tokens` / `--completion-tokens`（若编辑器可提供）以得到真实消耗统计。
 
 ## 🧩 编辑器集成
 

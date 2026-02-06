@@ -147,7 +147,17 @@ Skill 定义“阶段流程 + 事件记录”，Agent 只需按流程调用：
 
 ### 4.2 模型配置与角色映射
 
-`config.yaml` 支持模型注册与角色映射，但 **模型调用由编辑器负责**。当前配置主要用于规划阶段的约束与未来扩展。
+`config.yaml` 支持模型注册与角色映射，但 **模型调用由编辑器负责**。当前默认角色示例：
+
+| 角色 | 默认模型 | 用途 |
+|------|----------|------|
+| architect | cursor/opus-4.6-max | 架构设计 |
+| planner | cursor/opus-4.6-max | 任务规划 |
+| dev | cursor/gpt-5.2-codex-extra-high | 开发实现（任务按此模型上下文拆分） |
+| verifier | cursor/auto | 验证检查（Cursor 自动选模型） |
+| rescue | cursor/opus-4.6-max | 救援修复 |
+
+配置主要用于规划阶段的约束、上下文窗口计算与未来扩展；实际调用由 Cursor/OpenCode 根据 Skill 与本地设置执行。
 
 ### 4.3 工具链抽象 (Toolchain Abstraction)
 
