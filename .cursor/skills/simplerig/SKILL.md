@@ -39,35 +39,47 @@ description: SimpleRig Skill 驱动工作流。Agent 按阶段执行开发并记
 
 ## 阶段 1: 规划 (plan)
 
-1. 分析用户需求并扫描项目结构
-2. 制定开发计划，包含：
+1. 记录开始事件：
+   ```bash
+   simplerig emit stage.started --stage plan --run-id <run_id>
+   ```
+2. 分析用户需求并扫描项目结构
+3. 制定开发计划，包含：
    - 需要创建的文件
    - 需要修改的文件
    - 实现步骤
-3. 将计划保存到 `simplerig_data/runs/<run_id>/artifacts/plan.json`
-4. 记录完成事件：
+4. 将计划保存到 `simplerig_data/runs/<run_id>/artifacts/plan.json`
+5. 记录完成事件：
    ```bash
    simplerig emit stage.completed --stage plan --run-id <run_id>
    ```
 
 ## 阶段 2: 开发 (develop)
 
-1. 读取 `plan.json`
-2. 按计划创建/修改文件
-3. 将变更记录到 `code_changes.json`
-4. 记录完成事件：
+1. 记录开始事件：
+   ```bash
+   simplerig emit stage.started --stage develop --run-id <run_id>
+   ```
+2. 读取 `plan.json`
+3. 按计划创建/修改文件
+4. 将变更记录到 `code_changes.json`
+5. 记录完成事件：
    ```bash
    simplerig emit stage.completed --stage develop --run-id <run_id>
    ```
 
 ## 阶段 3: 验证 (verify)
 
-1. 运行 Lint 检查：`ruff check .`
-2. 运行测试：`pytest`
+1. 记录开始事件：
+   ```bash
+   simplerig emit stage.started --stage verify --run-id <run_id>
+   ```
+2. 运行 Lint 检查：`ruff check .`
+3. 运行测试：`pytest`
    - 若返回 exit code 5（未收集到测试），视为跳过，不视为失败
-3. 将结果保存到 `verify_result.json`（无测试时标记为跳过）
-4. 如果失败，回到阶段 2 修复
-5. 记录完成事件：
+4. 将结果保存到 `verify_result.json`（无测试时标记为跳过）
+5. 如果失败，回到阶段 2 修复
+6. 记录完成事件：
    ```bash
    simplerig emit stage.completed --stage verify --run-id <run_id>
    ```
@@ -80,6 +92,22 @@ description: SimpleRig Skill 驱动工作流。Agent 按阶段执行开发并记
    ```bash
    simplerig emit run.completed --run-id <run_id>
    ```
+
+## TDD / BDD 模式（可选）
+
+- **TDD 模式**（`--tdd`）：在 `simplerig run` 时启用。develop 阶段会执行红绿循环：若 `plan.json` 中提供 `tdd_test_file` / `tdd_impl_file`，将调用 `TDDRunner.run_cycle()`，并通过事件发射 `tdd.red_started`、`tdd.green_passed`、`tdd.cycle_completed` 等。
+- **BDD 模式**（`--bdd`）：在 `simplerig run` 时启用。verify 阶段会扫描 `artifacts/` 下的 `.feature` 文件并用 `BDDRunner` 执行，结果写入 `verify_result.json` 的 `bdd` 字段，并生成 `bdd_report.json` / `bdd_report.html`。
+- **独立 BDD 命令**：
+  - `simplerig bdd generate <spec.json>`：从规格 JSON 生成 `.feature` 文件
+  - `simplerig bdd run <path.feature>`：单独运行 BDD 测试，支持 `--report text|json|html`
+
+示例：
+```bash
+simplerig run "需求" --tdd
+simplerig run "需求" --bdd
+simplerig bdd generate spec.json -o features/
+simplerig bdd run features/demo.feature --report html
+```
 
 ## 事件与产物
 

@@ -2,12 +2,11 @@
 Planner - 改进版任务规划
 关键改进：按执行模型的上下文要求拆分任务
 """
-import json
+import re
 from dataclasses import dataclass
-from typing import List, Dict, Optional
-from pathlib import Path
+from typing import List, Dict
 
-from .config import get_config, ModelConfig
+from .config import get_config
 
 
 @dataclass
@@ -46,7 +45,7 @@ class Planner:
         # 可配置的并行组数
         self.task_groups = self.config.parallel.get("task_groups", 3)
         
-        print(f"Planner initialized:")
+        print("Planner initialized:")
         print(f"  Planner model: {self.planner_model_name}")
         print(f"  Dev model: {self.dev_model_name}")
         print(f"  Safe limit (for splitting): {self.safe_limit}")
@@ -66,33 +65,79 @@ class Planner:
         tasks = []
         
         for i, module in enumerate(modules):
-            # 估算上下文
             estimated = self._estimate_context(module)
-            
-            # 如果超执行模型的安全限制，继续拆分
+            deps = self._detect_dependencies(module, modules, f"task_{i}", tasks)
+            group = self._assign_group(deps, tasks)
+
             if estimated > self.safe_limit:
                 sub_tasks = self._split_module(module, self.safe_limit, i)
+                if sub_tasks:
+                    sub_tasks[0].dependencies = deps
+                    for t in sub_tasks:
+                        t.parallel_group = group
                 tasks.extend(sub_tasks)
             else:
                 tasks.append(AtomicTask(
                     id=f"task_{i}",
                     description=module,
                     estimated_context=estimated,
-                    dependencies=[],
-                    parallel_group=i % self.task_groups,
+                    dependencies=deps,
+                    parallel_group=group,
                     assigned_model=self.dev_model_name,  # 明确分配给 dev 模型
                 ))
-        
-        # 设置依赖（线性依赖，可改进为图结构）
-        for i in range(1, len(tasks)):
-            tasks[i].dependencies.append(tasks[i-1].id)
         
         return tasks
     
     def _parse_modules(self, architecture: str) -> List[str]:
         """解析架构文档，提取模块"""
-        lines = [l.strip() for l in architecture.split('\n') if l.strip()]
-        return [l for l in lines if not l.startswith('#')]
+        lines = [line.strip() for line in architecture.split('\n') if line.strip()]
+        return [line for line in lines if not line.startswith('#')]
+
+    def _detect_dependencies(
+        self,
+        module: str,
+        all_modules: List[str],
+        task_id: str,
+        existing_tasks: List[AtomicTask],
+    ) -> List[str]:
+        """
+        识别模块依赖（简易关键词匹配）。
+        """
+        module_text = module.lower()
+        deps = []
+
+        def extract_keywords(text: str) -> List[str]:
+            # 提取模块名与核心词
+            if ":" in text:
+                text = text.split(":", 1)[1]
+            if "-" in text:
+                text = text.split("-", 1)[0]
+            tokens = re.split(r"[^a-zA-Z0-9_]+", text.lower())
+            return [t for t in tokens if len(t) > 2]
+
+        for task in existing_tasks:
+            keywords = extract_keywords(task.description)
+            if any(k in module_text for k in keywords):
+                deps.append(task.id)
+
+        # 去重并保持稳定顺序
+        seen = set()
+        ordered = []
+        for dep in deps:
+            if dep not in seen:
+                seen.add(dep)
+                ordered.append(dep)
+        return ordered
+
+    def _assign_group(self, deps: List[str], existing_tasks: List[AtomicTask]) -> int:
+        """根据依赖的最大 group 值 +1 确定当前 group"""
+        if not deps:
+            return 0
+        max_group = max(
+            (t.parallel_group for t in existing_tasks if t.id in deps),
+            default=0,
+        )
+        return max_group + 1
     
     def _estimate_context(self, module_desc: str) -> int:
         """
@@ -134,12 +179,20 @@ class Planner:
     
     def export_plan(self, tasks: List[AtomicTask]) -> Dict:
         """导出执行计划"""
+        group_ids = sorted(set(t.parallel_group for t in tasks))
         return {
             "planner_model": self.planner_model_name,
             "dev_model": self.dev_model_name,
             "safe_context_limit": self.safe_limit,
             "total_tasks": len(tasks),
-            "parallel_groups": len(set(t.parallel_group for t in tasks)),
+            "parallel_groups": [
+                [t.id for t in tasks if t.parallel_group == g]
+                for g in group_ids
+            ],
+            "parallel_group_count": len(group_ids),
+            "dag_edges": {
+                t.id: t.dependencies for t in tasks if t.dependencies
+            },
             "tasks": [
                 {
                     "id": t.id,

@@ -11,10 +11,9 @@
 import hashlib
 import json
 import os
-import re
 import time
 from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, Iterator, List, Optional, Union
@@ -271,7 +270,7 @@ class EventWriter:
                         try:
                             event = Event.from_json(line)
                             self._seq = max(self._seq, event.seq)
-                        except:
+                        except Exception:
                             pass
     
     def write(self, event: Event) -> Event:

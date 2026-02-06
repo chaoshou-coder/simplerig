@@ -46,7 +46,27 @@ models:
       cost_per_1k: 0.0
       strengths: ["verification", "review", "general_tasks"]
       tier: "standard"
-    
+
+    # Cursor Opus 4.6 Max - 架构/规划/救援
+    cursor/opus-4.6-max:
+      provider: "cursor"
+      context_limit: 200000
+      performance_degradation_point: 0.50
+      optimal_context: 80000
+      cost_per_1k: 0.0
+      strengths: ["architecture", "planning", "complex_reasoning", "rescue"]
+      tier: "extra_high"
+
+    # Cursor Auto - 验证用
+    cursor/auto:
+      provider: "cursor"
+      context_limit: 200000
+      performance_degradation_point: 0.50
+      optimal_context: 80000
+      cost_per_1k: 0.0
+      strengths: ["verification", "review", "auto_select"]
+      tier: "standard"
+
     # ===== 外部 API 模型 (备用) =====
     opencode/kimi-k2.5-free:
       provider: "api"
@@ -79,13 +99,12 @@ models:
       strengths: ["complex_reasoning", "reliable", "long_context", "code_gen"]
   
   # 角色分配（从 config 读取）
-  # 现在使用 Cursor 内置模型进行开发
   roles:
-    architect: "cursor/gpt-5.2-high"        # GPT5.2 high - 架构设计
-    planner: "cursor/gpt-5.2-high"          # GPT5.2 high - 任务规划
+    architect: "cursor/opus-4.6-max"         # Opus 4.6 Max - 架构设计
+    planner: "cursor/opus-4.6-max"          # Opus 4.6 Max - 任务规划
     dev: "cursor/gpt-5.2-codex-extra-high"  # GPT5.2 codex extra high - 开发实现
-    verifier: "cursor/gpt-5.2"              # GPT5.2 - 验证检查
-    rescue: "cursor/gpt-5.2-codex-extra-high"  # GPT5.2 codex extra high - 救援修复
+    verifier: "cursor/auto"                 # Cursor Auto - 验证检查
+    rescue: "cursor/opus-4.6-max"            # Opus 4.6 Max - 救援修复
 
 # API 配置 (仅在使用 api provider 时需要)
 api:

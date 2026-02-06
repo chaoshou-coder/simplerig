@@ -10,7 +10,7 @@ Stats - 统计模块
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from .events import EventReader, ArtifactStore
 
@@ -213,7 +213,7 @@ def parse_iso_timestamp(ts: str) -> Optional[datetime]:
         if ts.endswith('Z'):
             ts = ts[:-1] + '+00:00'
         return datetime.fromisoformat(ts)
-    except:
+    except Exception:
         return None
 
 

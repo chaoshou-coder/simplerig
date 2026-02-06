@@ -5,13 +5,15 @@ Lint Guard - 改进版代码风格检查
 2. 项目结构可配置（source_dirs/test_dirs）
 3. 更好的错误处理和报告
 """
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Tuple
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 from .config import get_config
+from .events import EventWriter
 
 
 @dataclass
@@ -35,6 +37,19 @@ class LintResult:
     stderr: str
 
 
+@dataclass
+class TestRunResult:
+    """测试执行结果"""
+    success: bool
+    exit_code: int  # 0=passed, 1=failed, 5=no tests
+    stdout: str
+    stderr: str
+    skipped: bool
+    test_count: int
+    passed_count: int
+    failed_count: int
+
+
 class LintGuard:
     """
     代码风格守卫 - 改进版
@@ -45,9 +60,17 @@ class LintGuard:
     3. 更好的错误处理和报告
     """
     
-    def __init__(self, project_root: str = ".", config=None):
+    def __init__(
+        self,
+        project_root: str = ".",
+        config=None,
+        writer: Optional[EventWriter] = None,
+        run_id: str = "",
+    ):
         self.project_root = Path(project_root)
         self.config = config or get_config()
+        self.writer = writer
+        self.run_id = run_id
         
         # 从配置读取工具链
         self.linter = self.config.tools.get("linter", "ruff")
@@ -62,12 +85,18 @@ class LintGuard:
         self.source_dirs = self.config.project.get("source_dirs", ["src"])
         self.test_dirs = self.config.project.get("test_dirs", ["tests"])
         
-        print(f"LintGuard initialized:")
+        print("LintGuard initialized:")
         print(f"  Linter: {self.linter}")
         print(f"  Formatter: {self.formatter}")
         print(f"  Test runner: {self.test_runner}")
         print(f"  Source dirs: {self.source_dirs}")
         print(f"  Test dirs: {self.test_dirs}")
+
+    def _emit(self, event_type: str, **data) -> None:
+        """可选事件发射（未传 writer 则跳过）"""
+        if not self.writer:
+            return
+        self.writer.emit(event_type, self.run_id, **data)
     
     def check_and_fix(self, files: List[str] = None) -> LintResult:
         """
@@ -83,6 +112,8 @@ class LintGuard:
         fixed_count = 0
         stdout_all = []
         stderr_all = []
+
+        self._emit("lint.started", targets=target)
         
         # 1. 运行 linter
         linter_result = self._run_tool(
@@ -116,6 +147,19 @@ class LintGuard:
         stderr_all.append(final_result["stderr"])
         
         success = len(all_issues) == 0
+
+        if success:
+            self._emit(
+                "lint.passed",
+                fixed_count=fixed_count,
+                issues_count=len(all_issues),
+            )
+        else:
+            self._emit(
+                "lint.failed",
+                fixed_count=fixed_count,
+                issues_count=len(all_issues),
+            )
         
         return LintResult(
             success=success,
@@ -126,6 +170,81 @@ class LintGuard:
             stderr="\n".join(stderr_all)
         )
     
+    def run_tests(self, test_files: List[str] = None) -> TestRunResult:
+        """
+        运行测试。使用 self.test_runner + self.test_runner_args。
+        exit code 5 -> skipped=True, success=True。
+        """
+        targets = test_files or self._get_test_targets()
+        cmd = [self.test_runner] + self.test_runner_args + targets
+        timeout = self.config.get_timeout("tool", 300)
+
+        self._emit("test.started", targets=targets)
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=self.project_root,
+                timeout=timeout,
+            )
+            stdout = result.stdout or ""
+            stderr = result.stderr or ""
+            exit_code = result.returncode
+        except subprocess.TimeoutExpired:
+            stderr = f"{self.test_runner} timed out after {timeout}s"
+            stdout = ""
+            exit_code = 124
+        except FileNotFoundError:
+            stderr = f"{self.test_runner} not found. Please install it."
+            stdout = ""
+            exit_code = 1
+
+        test_count, passed_count, failed_count = self._parse_pytest_summary(stdout + stderr)
+        skipped = exit_code == 5
+        success = exit_code in (0, 5)
+
+        if exit_code == 0:
+            self._emit(
+                "test.passed",
+                exit_code=exit_code,
+                passed_count=passed_count,
+                failed_count=failed_count,
+                test_count=test_count,
+            )
+        elif exit_code == 5:
+            self._emit("test.skipped", exit_code=exit_code)
+        else:
+            self._emit(
+                "test.failed",
+                exit_code=exit_code,
+                passed_count=passed_count,
+                failed_count=failed_count,
+                test_count=test_count,
+            )
+
+        return TestRunResult(
+            success=success,
+            exit_code=exit_code,
+            stdout=stdout,
+            stderr=stderr,
+            skipped=skipped,
+            test_count=test_count,
+            passed_count=passed_count,
+            failed_count=failed_count,
+        )
+
+    def full_check(self, files: List[str] = None) -> Dict:
+        """完整检查（lint + tests）"""
+        lint_result = self.check_and_fix(files)
+        test_result = self.run_tests()
+        return {
+            "lint": lint_result,
+            "tests": test_result,
+            "overall_success": lint_result.success and test_result.success,
+        }
+
     def _get_default_targets(self) -> List[str]:
         """获取默认检查目标"""
         targets = []
@@ -141,6 +260,34 @@ class LintGuard:
             targets = ["."]
         
         return targets
+
+    def _get_test_targets(self) -> List[str]:
+        """获取测试目标（仅 test_dirs）"""
+        targets = []
+        for dir_name in self.test_dirs:
+            dir_path = self.project_root / dir_name
+            if dir_path.exists():
+                targets.append(dir_name)
+        if not targets:
+            targets = ["."]
+        return targets
+
+    def _parse_pytest_summary(self, output: str) -> Tuple[int, int, int]:
+        """解析 pytest 输出中的 passed/failed 统计"""
+        passed = 0
+        failed = 0
+        for line in output.splitlines():
+            if "passed" in line or "failed" in line or "error" in line:
+                passed_match = re.search(r"(\d+)\s+passed", line)
+                failed_match = re.search(r"(\d+)\s+failed", line)
+                error_match = re.search(r"(\d+)\s+errors?", line)
+                if passed_match:
+                    passed = int(passed_match.group(1))
+                if failed_match:
+                    failed = int(failed_match.group(1))
+                if error_match:
+                    failed += int(error_match.group(1))
+        return passed + failed, passed, failed
     
     def _run_tool(self, tool: str, args: List[str], fix: bool = False) -> Dict:
         """运行工具"""
@@ -271,7 +418,7 @@ class LintGuard:
                     message=message,
                     fixable=fixable
                 ))
-            except:
+            except Exception:
                 continue
         
         return issues
@@ -292,7 +439,6 @@ class LintGuard:
             try:
                 file_path = parts[0]
                 line_num = int(parts[1])
-                col = int(parts[2])
                 rest = parts[3].strip()
                 code = rest.split()[0]
                 message = ' '.join(rest.split()[1:])
@@ -304,7 +450,7 @@ class LintGuard:
                     message=message,
                     fixable=False  # flake8 不自动修复
                 ))
-            except:
+            except Exception:
                 continue
         
         return issues
@@ -335,7 +481,7 @@ class LintGuard:
                     message=message,
                     fixable=False
                 ))
-            except:
+            except Exception:
                 continue
         
         return issues
@@ -347,7 +493,7 @@ class LintGuard:
                 if "Fixed" in line:
                     try:
                         return int(line.split()[1])
-                    except:
+                    except Exception:
                         pass
         return 0
     
@@ -358,7 +504,7 @@ class LintGuard:
                 if "reformatted" in line:
                     try:
                         return int(line.split()[0])
-                    except:
+                    except Exception:
                         pass
         return 0
     

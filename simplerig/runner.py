@@ -9,7 +9,6 @@ Runner - 阶段机与断点续传
 """
 import enum
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set
 
@@ -19,7 +18,6 @@ from .events import (
     EventReader,
     ArtifactStore,
     ArtifactRef,
-    RunLock,
     create_run_context,
 )
 from .config import get_config
@@ -210,7 +208,8 @@ class StageContext:
     state: RunState
     config: Any
     requirement: str = ""
-    
+    options: Dict[str, Any] = field(default_factory=dict)
+
     # 当前阶段信息
     stage_name: str = ""
     inputs: Dict[str, ArtifactRef] = field(default_factory=dict)
@@ -258,6 +257,8 @@ class StageMachine:
         requirement: str = "",
         resume: bool = False,
         from_stage: str = None,
+        tdd: bool = False,
+        bdd: bool = False,
     ) -> RunState:
         """
         执行阶段机
@@ -332,6 +333,7 @@ class StageMachine:
                 state=state,
                 config=config,
                 requirement=requirement,
+                options={"tdd": tdd, "bdd": bdd},
             )
             
             # 执行各阶段
@@ -419,11 +421,17 @@ class StageMachine:
             if name in ctx.state.artifacts
         }
         
-        # 写入 stage.started 事件
+        # 阶段 -> 角色 -> 模型名称 映射
+        _stage_role = {"plan": "planner", "develop": "dev", "verify": "verifier", "integrate": "verifier"}
+        _role = _stage_role.get(stage.name, "dev")
+        _model = ctx.config.roles.get(_role, "unknown")
+
+        # 写入 stage.started 事件（含模型名称）
         self.writer.emit(
             "stage.started",
             self.run_dir.name,
             stage=stage.name,
+            model=_model,
             inputs=list(ctx.inputs.keys()),
         )
         

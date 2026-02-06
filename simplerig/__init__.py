@@ -4,7 +4,7 @@ SimpleRig - 多 Agent 工作流框架
 """
 from .config import Config, get_config, reload_config
 from .planner import Planner, AtomicTask
-from .lint_guard import LintGuard, LintResult
+from .lint_guard import LintGuard, LintResult, TestRunResult
 from .events import (
     Event,
     ArtifactRef,
@@ -42,6 +42,18 @@ from .stages import (
     verify_handler,
     integrate_handler,
     get_default_stages,
+    get_enhanced_stages,
+)
+from .tdd import TDDPhase, TDDResult, TDDRunner
+from .bdd import (
+    Step,
+    Scenario,
+    Feature,
+    BDDGenerator,
+    BDDRunner,
+    TestResult,
+    ScenarioResult,
+    StepResult,
 )
 from .stats import (
     TokenUsage,
@@ -66,6 +78,7 @@ __all__ = [
     # LintGuard
     "LintGuard",
     "LintResult",
+    "TestRunResult",
     # Events
     "Event",
     "ArtifactRef",
@@ -100,6 +113,20 @@ __all__ = [
     "verify_handler",
     "integrate_handler",
     "get_default_stages",
+    "get_enhanced_stages",
+    # TDD
+    "TDDPhase",
+    "TDDResult",
+    "TDDRunner",
+    # BDD
+    "Step",
+    "Scenario",
+    "Feature",
+    "BDDGenerator",
+    "BDDRunner",
+    "TestResult",
+    "ScenarioResult",
+    "StepResult",
     # Stats
     "TokenUsage",
     "StageStats",

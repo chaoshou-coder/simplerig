@@ -14,16 +14,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
-from .events import (
-    Event,
-    EventWriter,
-    EventReader,
-    ArtifactStore,
-    ArtifactRef,
-    create_run_context,
-)
+from .events import ArtifactStore, ArtifactRef, create_run_context
 from .config import get_config
 
 
@@ -178,6 +171,36 @@ class TaskGraph:
                 stats[task.status.value] += 1
             stats["total"] = len(self.tasks)
             return stats
+
+    def detect_cycles(self) -> List[str]:
+        """
+        Kahn 算法检测循环。
+        返回参与循环的 task_id 列表。空列表 = 无循环。
+        """
+        with self._lock:
+            in_degree = {tid: 0 for tid in self.tasks}
+            adjacency: Dict[str, List[str]] = {tid: [] for tid in self.tasks}
+
+            for task in self.tasks.values():
+                for dep in task.dependencies:
+                    if dep not in in_degree:
+                        continue
+                    in_degree[task.id] += 1
+                    adjacency[dep].append(task.id)
+
+            queue = [tid for tid, deg in in_degree.items() if deg == 0]
+            visited = 0
+            while queue:
+                tid = queue.pop(0)
+                visited += 1
+                for nxt in adjacency.get(tid, []):
+                    in_degree[nxt] -= 1
+                    if in_degree[nxt] == 0:
+                        queue.append(nxt)
+
+            if visited == len(in_degree):
+                return []
+            return [tid for tid, deg in in_degree.items() if deg > 0]
     
     def can_retry(self, task_id: str) -> bool:
         """检查任务是否可以重试"""
@@ -369,6 +392,10 @@ class ParallelScheduler:
         
         # 添加任务到图
         self.graph.add_tasks(tasks)
+
+        cycles = self.graph.detect_cycles()
+        if cycles:
+            raise ValueError(f"任务图存在循环依赖: {cycles}")
         
         # 写入 task.created 事件
         for task in tasks:

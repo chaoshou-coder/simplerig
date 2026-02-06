@@ -3,11 +3,20 @@ SimpleRig CLI - 命令行入口
 子命令：init/emit/run/status/tail/list/stats/help
 """
 import argparse
+import os
 import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+# Windows 环境下强制 UTF-8，防止中文乱码
+if sys.platform == "win32":
+    os.environ.setdefault("PYTHONUTF8", "1")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
 
 from .config import get_config
 from .events import EventWriter
@@ -137,7 +146,29 @@ def create_parser() -> argparse.ArgumentParser:
         default=None,
         help="并行 agent 数上限"
     )
-    
+    run_parser.add_argument(
+        "--tdd",
+        action="store_true",
+        help="启用 TDD 模式（develop 阶段执行红绿循环）"
+    )
+    run_parser.add_argument(
+        "--bdd",
+        action="store_true",
+        help="启用 BDD 模式（verify 阶段执行 .feature 文件）"
+    )
+
+    # bdd 子命令组
+    bdd_parser = subparsers.add_parser("bdd", help="BDD 相关命令")
+    bdd_sub = bdd_parser.add_subparsers(dest="bdd_command", help="bdd 子命令")
+    bdd_gen = bdd_sub.add_parser("generate", help="从规格生成 .feature 文件")
+    bdd_gen.add_argument("spec", type=str, help="规格 JSON 文件路径")
+    bdd_gen.add_argument("-o", "--output-dir", type=str, default=".", help="输出目录")
+    bdd_gen.add_argument("--run-id", type=str, help="Run ID（可选，用于事件）")
+    bdd_run = bdd_sub.add_parser("run", help="运行 .feature 文件")
+    bdd_run.add_argument("feature", type=str, help=".feature 文件路径")
+    bdd_run.add_argument("--run-id", type=str, help="Run ID（可选）")
+    bdd_run.add_argument("--report", type=str, choices=["text", "json", "html"], default="text", help="报告格式")
+
     # status 子命令
     status_parser = subparsers.add_parser("status", help="查看运行状态")
     status_parser.add_argument(
@@ -395,7 +426,7 @@ def cmd_emit(args: argparse.Namespace) -> int:
 
 def cmd_run(args: argparse.Namespace) -> int:
     """执行 run 命令"""
-    from .runner import StageMachine, get_run_status
+    from .runner import StageMachine
     from .stages import get_default_stages
     
     config = get_config()
@@ -447,20 +478,24 @@ def cmd_run(args: argparse.Namespace) -> int:
         print("预演完成，未实际执行")
         return 0
     
-    # 执行阶段机
+    # 执行阶段机（--tdd/--bdd 时使用增强阶段并传参）
     try:
         from .stats import collect_stats
-        
-        stages = get_default_stages()
+        from .stages import get_enhanced_stages
+
+        use_enhanced = getattr(args, "tdd", False) or getattr(args, "bdd", False)
+        stages = get_enhanced_stages() if use_enhanced else get_default_stages()
         machine = StageMachine(run_dir, stages=stages, fail_fast=args.fail_fast)
-        
+
         state = machine.run(
             requirement=args.requirement or "",
             resume=bool(args.resume),
             from_stage=args.from_stage,
+            tdd=getattr(args, "tdd", False),
+            bdd=getattr(args, "bdd", False),
         )
         
-        print(f"\n执行完成")
+        print("\n执行完成")
         print(f"状态: {state.status}")
         print(f"完成阶段: {', '.join(state.completed_stages)}")
         if state.skipped_stages:
@@ -555,7 +590,7 @@ def cmd_tail(args: argparse.Namespace) -> int:
                     event = json.loads(line)
                     if not event.get("type", "").startswith(args.filter.replace("*", "")):
                         continue
-                except:
+                except json.JSONDecodeError:
                     pass
             print(line)
     
@@ -603,6 +638,67 @@ def cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_bdd(args: argparse.Namespace) -> int:
+    """执行 bdd 子命令：generate / run"""
+    if getattr(args, "bdd_command", None) == "generate":
+        return cmd_bdd_generate(args)
+    if getattr(args, "bdd_command", None) == "run":
+        return cmd_bdd_run(args)
+    print("请使用 bdd generate 或 bdd run", file=sys.stderr)
+    return 1
+
+
+def cmd_bdd_generate(args: argparse.Namespace) -> int:
+    """bdd generate <spec.json> [-o output_dir] [--run-id]"""
+    import json
+    from pathlib import Path
+    from .events import EventWriter
+    from .bdd import BDDGenerator
+
+    spec_path = Path(args.spec)
+    if not spec_path.exists():
+        print(f"文件不存在: {spec_path}", file=sys.stderr)
+        return 1
+    with open(spec_path, encoding="utf-8") as f:
+        spec = json.load(f)
+    output_dir = Path(args.output_dir)
+    run_id = getattr(args, "run_id", None) or "cli"
+    runs_dir = get_runs_dir()
+    run_dir = runs_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    writer = EventWriter(run_dir)
+    gen = BDDGenerator(writer, run_id)
+    path = gen.generate_from_spec(spec, output_dir)
+    print(f"Generated: {path}")
+    return 0
+
+
+def cmd_bdd_run(args: argparse.Namespace) -> int:
+    """bdd run <path.feature> [--run-id] [--report text|json|html]"""
+    from pathlib import Path
+    from .config import get_config
+    from .events import EventWriter, ArtifactStore
+    from .bdd import BDDRunner
+
+    feature_path = Path(args.feature)
+    if not feature_path.exists():
+        print(f"文件不存在: {feature_path}", file=sys.stderr)
+        return 1
+    run_id = getattr(args, "run_id", None) or "cli"
+    report_fmt = getattr(args, "report", "text") or "text"
+    config = get_config()
+    runs_dir = get_runs_dir()
+    run_dir = runs_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    writer = EventWriter(run_dir)
+    store = ArtifactStore(run_dir)
+    runner = BDDRunner(config, writer, run_id, store=store)
+    result = runner.run_feature(feature_path)
+    out = runner.generate_report(result, report_fmt, store=store)
+    print(out)
+    return 0 if result.passed else 1
+
+
 def cmd_stats(args: argparse.Namespace) -> int:
     """执行 stats 命令"""
     from .stats import collect_stats
@@ -644,6 +740,7 @@ def main(argv: list[str] = None) -> int:
         "init": cmd_init,
         "emit": cmd_emit,
         "run": cmd_run,
+        "bdd": cmd_bdd,
         "status": cmd_status,
         "tail": cmd_tail,
         "list": cmd_list,
