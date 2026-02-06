@@ -16,7 +16,10 @@ description: "SimpleRig 多阶段开发工作流：规划→开发→验证→�
   - 错误：`cd /d e:\code\PROJECT && python -m pip show simplerig`
 - **`simplerig init` 的参数字符串**：在 PowerShell 下，双引号内过长或含中文时易报错「缺少终止符」。**优先用简短英文描述**（如 `"OpenClaw context manager - CLI and API"`），详细需求写在后续 plan 或 @ 的文档里即可。
 - **命令入口**：若 `simplerig` 未找到，一律用 `python -m simplerig.cli`。若仍报 `No module named simplerig.cli`，说明当前环境安装的是别的包或旧结构，需在当前项目下执行 `pip install -e <本机 SimpleRig 仓库路径>` 再重试。
-- **正确安装的判定**：`pip show simplerig` 会显示 `Location:`。若 Location 指向**其他项目**（例如 `E:\code\datagrab\src` 而非本机 SimpleRig 仓库如 `e:\code\SimpleRig`），说明装错了包。此时 `python -m simplerig.cli --help` 会报错。**必须先在该项目虚拟环境中卸载错误包并安装正确仓库**：`pip install -e <SimpleRig 仓库路径>`，成功后再执行 init。**禁止在未获得 run_id 的情况下继续本工作流**（不得“跳过 init、手动写 plan 代替”）；若无法成功 init，必须明确提示用户安装正确 SimpleRig 后重试。
+- **必须先激活项目本地 .venv**：执行任何 `pip` / `simplerig` / `python -m simplerig.cli` 前，**必须先激活当前项目根目录下的虚拟环境**（若存在 `.venv`）。否则终端可能沿用其他项目或全局 Python，导致 `pip show simplerig` 的 Location 指向错误项目、或 `simplerig.cli` 不可用。激活后再做检查与 init。
+  - Windows PowerShell（项目根下）：`.\.venv\Scripts\Activate.ps1`
+  - Linux/macOS（项目根下）：`source .venv/bin/activate`
+- **正确安装的判定**：`pip show simplerig` 会显示 `Location:` 与 `Editable project location:`。若 Location 或实际使用的 Python 来自**其他项目**（例如 `datagrab\.venv` 而当前项目是 eagle），或 `python -m simplerig.cli --help` 报错，说明未用对 venv 或装错了包。**先确保已激活当前项目的 .venv**，再在该 venv 中执行 `pip install -e <本项目内的 SimpleRig 路径或本机 SimpleRig 仓库路径>`（必要时先 `pip uninstall simplerig`）。**禁止在未获得 run_id 的情况下继续本工作流**（不得"跳过 init、手动写 plan 代替"）；若无法成功 init，必须明确提示用户激活项目 .venv 并安装正确 SimpleRig 后重试。
 
 ## 交互优先级（避免卡住）
 
@@ -34,15 +37,18 @@ description: "SimpleRig 多阶段开发工作流：规划→开发→验证→�
 ## 准备阶段
 
 1. **进入项目根目录**（若需切换）：用 `cd 路径`；在 PowerShell 中与下一命令用 `;` 分隔，不要用 `&&`。
-2. **检查安装**（在项目根下执行）：
+2. **激活项目本地 .venv**（若存在）：在项目根下先激活再执行后续命令，避免用到其他项目/全局环境。
+   - Windows PowerShell：`cd <项目根>; .\.venv\Scripts\Activate.ps1`
+   - 之后在同一 shell 中执行下面的检查与 init。
+3. **检查安装**（在已激活项目 venv 的 shell 中、项目根下执行）：
    ```bash
    python -m pip show simplerig
    python -m simplerig.cli --help
    ```
    - 若 `pip show` 的 **Location** 不是本机 SimpleRig 仓库路径（例如显示为其他项目如 `datagrab\src`），或 `simplerig.cli --help` 报错（如 `No module named simplerig.cli`），则视为**错误安装**：当前环境装的是别的包。必须先在该项目 venv 中执行 `pip install -e <本机 SimpleRig 仓库路径>`（必要时先 `pip uninstall simplerig`）再重试，**不得在未成功 init 获得 run_id 的情况下继续后续阶段**。
    - 只有 `simplerig.cli --help` 能正常执行时，才进行下一步 init。
-3. **检查配置**：确认项目根目录有 `config.yaml` 或环境变量 `SIMPLERIG_CONFIG`。
-4. **初始化 run**（在项目根下执行）：
+4. **检查配置**：确认项目根目录有 `config.yaml` 或环境变量 `SIMPLERIG_CONFIG`。
+5. **初始化 run**（在已激活项目 venv 的 shell 中、项目根下执行）：
    - 使用**简短英文描述**以避免 PowerShell 引号/编码问题，例如：`"OpenClaw context manager - CLI ocm, HTTP API, skills"`。详细需求由规划阶段从 @ 的 plan 或文档中读取。
    ```bash
    simplerig init "Short English description here"
