@@ -1,11 +1,21 @@
 ---
 name: simplerig
-description: SimpleRig Skill 驱动工作流。Agent 按阶段执行开发并记录事件。
+description: "SimpleRig 多阶段开发工作流：规划→开发→验证→完成，并记录事件。在以下情况必须启用本 Skill：用户提到「开发计划」「执行计划」「按计划执行」「现在执行」、或 @ 引用 .cursor/plans/*.plan.md、或要求按既有计划/需求执行开发时。也可通过 /simplerig 显式调用。"
 ---
 
 # SimpleRig 工作流
 
-当用户提出开发需求时，按以下流程执行（Agent 必须执行）。
+**何时启用本 Skill**：用户 @ 了 `.cursor/plans/*.plan.md`、或说「开发计划现在执行」「按计划执行」、或提出开发需求/要按既有计划执行时，都应启用本 Skill（无需用户必须输入 /simplerig）。
+
+当用户提出开发需求或要求执行计划时，按以下流程执行（Agent 必须执行）。
+
+## Shell 与平台（必读，避免无效重试）
+
+- **Windows PowerShell 不支持 `&&`**：不要使用 `cd 路径 && 命令`。应使用分号写在同一行，或先 `cd` 再在下一步执行命令。
+  - 正确：`cd e:\code\PROJECT; python -m pip show simplerig`
+  - 错误：`cd /d e:\code\PROJECT && python -m pip show simplerig`
+- **`simplerig init` 的参数字符串**：在 PowerShell 下，双引号内过长或含中文时易报错「缺少终止符」。**优先用简短英文描述**（如 `"OpenClaw context manager - CLI and API"`），详细需求写在后续 plan 或 @ 的文档里即可。
+- **命令入口**：若 `simplerig` 未找到，一律用 `python -m simplerig.cli`。若仍报 `No module named simplerig.cli`，说明当前环境安装的是别的包或旧结构，需在当前项目下执行 `pip install -e <本机 SimpleRig 仓库路径>` 再重试。
 
 ## 交互优先级（避免卡住）
 
@@ -22,20 +32,23 @@ description: SimpleRig Skill 驱动工作流。Agent 按阶段执行开发并记
 
 ## 准备阶段
 
-1. **检查安装**：
+1. **进入项目根目录**（若需切换）：用 `cd 路径`；在 PowerShell 中与下一命令用 `;` 分隔，不要用 `&&`。
+2. **检查安装**（任选一种，在项目根下执行）：
    ```bash
    python -m pip show simplerig
    ```
-2. **检查配置**：确认项目根目录有 `config.yaml` 或 `SIMPLERIG_CONFIG`
-3. **初始化 run**：
+   若无 `simplerig` 或版本/路径不对，在当前项目虚拟环境中安装：`pip install -e <SimpleRig 仓库路径>`。
+3. **检查配置**：确认项目根目录有 `config.yaml` 或环境变量 `SIMPLERIG_CONFIG`。
+4. **初始化 run**（在项目根下执行）：
+   - 使用**简短英文描述**以避免 PowerShell 引号/编码问题，例如：`"OpenClaw context manager - CLI ocm, HTTP API, skills"`。详细需求由规划阶段从 @ 的 plan 或文档中读取。
    ```bash
-   # 优先使用
-   simplerig init "用户的需求描述"
-   # 如果上述命令失败，使用备用方式
-   python -m simplerig.cli init "用户的需求描述"
-   # 输出: run_id=20260205_120000_abc123
+   simplerig init "Short English description here"
    ```
-4. **记录 run_id**：后续命令都需要使用
+   若 `simplerig` 命令不存在，改用：
+   ```bash
+   python -m simplerig.cli init "Short English description here"
+   ```
+   从输出中取得 `run_id=...`，后续所有 emit 均需带上 `--run-id <run_id>`。
 
 ## 阶段 1: 规划 (plan)
 
@@ -118,12 +131,13 @@ simplerig emit stage.completed --stage develop --run-id <run_id> --prompt-tokens
 
 ## 命令备用方式
 
-如果 `simplerig` 命令不可用，使用 `python -m simplerig.cli` 替代：
+若终端中 `simplerig` 不可用，一律使用 `python -m simplerig.cli`（同上，init 参数用简短英文）：
 ```bash
-python -m simplerig.cli init "需求"
+python -m simplerig.cli init "Short description"
 python -m simplerig.cli emit stage.completed --stage plan --run-id <run_id>
 python -m simplerig.cli status
 ```
+若报 `No module named simplerig.cli`，说明当前环境未正确安装本仓库的 SimpleRig，需在项目下执行 `pip install -e <SimpleRig 仓库路径>` 后再试。
 
 ## 断点续传
 
