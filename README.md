@@ -219,12 +219,12 @@ simplerig emit stage.completed --stage develop --run-id <id> --prompt-tokens 800
 
    ```bash
    # Linux/macOS
-   cp -r simplerig/.cursor/skills/ /path/to/your/project/.cursor/skills/
+   cp -r simplerig/.cursor/skills/ /path/to/your/project/.cursor/
    ```
 
    ```powershell
    # Windows PowerShell
-   Copy-Item -Recurse simplerig\.cursor\skills\ \path\to\your\project\.cursor\skills\
+   Copy-Item -Recurse simplerig\.cursor\skills\ \path\to\your\project\.cursor\
    ```
 
 2. **在 Cursor Chat 中使用：**
