@@ -42,13 +42,14 @@ description: "SimpleRig 多阶段开发工作流：规划→开发→验证→�
      - `python -c "import sys; print(sys.executable)"`
      - `python -m pip -V`
      - PowerShell：`$env:VIRTUAL_ENV`
-   - 若已激活项目 venv（`$env:VIRTUAL_ENV` 非空，或 `python -m pip -V` 路径位于当前项目的 `.venv`/`venv` 下），继续下一步。
-   - 若未激活：
-     - 优先自动尝试激活（存在即用，按顺序）：`.venv` → `venv` → `env` → `ENV`
-       - Windows PowerShell：`.\<venv>\Scripts\Activate.ps1`
-       - Linux/macOS：`source <venv>/bin/activate`
-     - 若存在多个候选或无法判断：**询问用户**“该项目使用哪个虚拟环境？名称/路径是什么？”得到回复后再激活，并重新输出上述证据。
-     - 若项目尚未配置 venv：**询问用户**是否允许创建 `.venv`；同意后创建并激活，再继续。
+   - **必须向用户确认要使用哪个 venv**（用户可能有很多虚拟环境；在确认前不得自检/不得安装）：
+     - 先在项目根目录查找候选：`.venv`、`venv`、`env`、`ENV`（以及用户项目约定的其他名称）。
+     - 若当前已激活 venv（`$env:VIRTUAL_ENV` 非空）：把该路径展示给用户，并询问“是否使用这个 venv 继续？”。
+     - 无论是否已激活，都要让用户明确回复 **目标 venv 的名称/相对路径/绝对路径**（例如：`.venv`，或 `E:\code\eagle\.venv`）。
+     - 拿到用户回复后再执行激活：
+       - Windows PowerShell：`cd <项目根>; .\<venv>\Scripts\Activate.ps1`
+       - Linux/macOS：`cd <项目根>; source <venv>/bin/activate`
+     - 激活后**必须再次输出并记录证据**（`sys.executable` / `pip -V` / `VIRTUAL_ENV`），确认已切换到用户指定的 venv，才允许进入步骤 3。
 3. **检查安装**（必须在已激活项目 venv 的 shell 中、项目根下执行）：
    ```bash
    python -m pip show simplerig
