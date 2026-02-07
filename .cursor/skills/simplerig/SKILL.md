@@ -37,15 +37,25 @@ description: "SimpleRig 多阶段开发工作流：规划→开发→验证→�
 ## 准备阶段
 
 1. **进入项目根目录**（若需切换）：用 `cd 路径`；在 PowerShell 中与下一命令用 `;` 分隔，不要用 `&&`。
-2. **激活项目本地 .venv**（若存在）：在项目根下先激活再执行后续命令，避免用到其他项目/全局环境。
-   - Windows PowerShell：`cd <项目根>; .\.venv\Scripts\Activate.ps1`
-   - 之后在同一 shell 中执行下面的检查与 init。
-3. **检查安装**（在已激活项目 venv 的 shell 中、项目根下执行）：
+2. **检测并激活虚拟环境（必须）**：禁止在未确认 venv 的情况下执行任何安装动作（避免装到系统环境/其他项目 venv）。
+   - 先输出并记录证据（把输出贴回对话，便于定位环境问题）：
+     - `python -c "import sys; print(sys.executable)"`
+     - `python -m pip -V`
+     - PowerShell：`$env:VIRTUAL_ENV`
+   - 若已激活项目 venv（`$env:VIRTUAL_ENV` 非空，或 `python -m pip -V` 路径位于当前项目的 `.venv`/`venv` 下），继续下一步。
+   - 若未激活：
+     - 优先自动尝试激活（存在即用，按顺序）：`.venv` → `venv` → `env` → `ENV`
+       - Windows PowerShell：`.\<venv>\Scripts\Activate.ps1`
+       - Linux/macOS：`source <venv>/bin/activate`
+     - 若存在多个候选或无法判断：**询问用户**“该项目使用哪个虚拟环境？名称/路径是什么？”得到回复后再激活，并重新输出上述证据。
+     - 若项目尚未配置 venv：**询问用户**是否允许创建 `.venv`；同意后创建并激活，再继续。
+3. **检查安装**（必须在已激活项目 venv 的 shell 中、项目根下执行）：
    ```bash
    python -m pip show simplerig
    python -m simplerig.cli --help
    ```
-   - 若 `pip show` 的 **Location** 不是本机 SimpleRig 仓库路径（例如显示为其他项目如 `datagrab\src`），或 `simplerig.cli --help` 报错（如 `No module named simplerig.cli`），则视为**错误安装**：当前环境装的是别的包。必须先在该项目 venv 中执行 `pip install -e <本机 SimpleRig 仓库路径>`（必要时先 `pip uninstall simplerig`）再重试，**不得在未成功 init 获得 run_id 的情况下继续后续阶段**。
+   - 若 `pip show simplerig` 显示未找到，或 `simplerig.cli --help` 报错：**不要**直接 `pip install`（可能会装到系统/错误环境）。先回到步骤 2 让用户确认/激活正确 venv（必要时询问 venv 名称/路径），确认后再在该 venv 中安装正确的 SimpleRig 并重试。
+   - 若 `pip show` 的 **Location** 或 `python -m pip -V` 显示当前 Python 来自其他项目 venv（例如 `datagrab\.venv`），则视为**用错环境**：先切回并激活当前项目的 venv，再重试本步骤。
    - 只有 `simplerig.cli --help` 能正常执行时，才进行下一步 init。
 4. **检查配置**：确认项目根目录有 `config.yaml` 或环境变量 `SIMPLERIG_CONFIG`。
 5. **初始化 run**（在已激活项目 venv 的 shell 中、项目根下执行）：
